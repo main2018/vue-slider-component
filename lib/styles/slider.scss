@@ -1,0 +1,18 @@
+
+.vue-slider-component {
+  position: relative;
+  box-sizing: content-box;
+  user-select: none;
+  display: block;
+  border-radius: 15px;
+  background-color: #ccc;
+
+  &.vue-slider-disabled {
+    opacity: .5;
+    cursor: not-allowed;
+
+    .vue-slider-dot {
+      cursor: not-allowed;
+    }
+  }
+}
