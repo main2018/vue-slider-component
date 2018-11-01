@@ -206,6 +206,7 @@ export default class VueSlider extends Vue {
     }
   }
 
+  // 滑块滑动的主方向
   get mainDirection(): string {
     switch (this.direction) {
       case 'ltr':
@@ -276,11 +277,13 @@ export default class VueSlider extends Vue {
       const prevPos = valuePosRange[i - 1] || [0, 100]
       valuePosRange.push([
         this.minRange ?
-          prevPos[0] + this.minRangeDir :
+          this.minRangeDir * i :
           !this.enableCross ?
           dotsPos[i - 1] || 0 :
           0,
-        !this.enableCross ?
+        this.minRange ?
+          (100 - this.minRangeDir * (dotsPos.length - 1 - i)) :
+          !this.enableCross ?
           dotsPos[i + 1] || 100 :
           100,
       ])
@@ -334,7 +337,7 @@ export default class VueSlider extends Vue {
 
   // 同步值
   syncValueByPos() {
-    const values = [...this.dotsPos].sort().map(pos => this.parsePos(pos))
+    const values = [...this.dotsPos].sort((a, b) => a - b).map(pos => this.parsePos(pos))
     this.$emit('change', values.length === 1 ? values[0] : values)
   }
 
@@ -350,34 +353,34 @@ export default class VueSlider extends Vue {
   // 设置单个滑块的位置
   setDotPos(pos: number, index: number) {
     // 滑块变化的距离
-    const curPos = this.dotsPos.find((_, i) => i === index)
-    if (curPos === undefined) {
-      return false
+    let changePos = pos - this.dotsPos[index]
+    let changePosArr: number[] = new Array(this.dotsPos.length)
+
+    // 固定模式下，同步更新其他滑块的位置，若有滑块超过范围，则不更新位置
+    if (this.fixed) {
+      this.dotsPos.forEach((originPos, i) => {
+        if (i !== index) {
+          const { pos: lastPos, inRange } = this.$refs.dot[i].getPos(originPos + changePos)
+          if (!inRange) {
+            changePos = Math[changePos < 0 ? 'max' : 'min'](lastPos - originPos, changePos)
+          }
+        }
+      })
+      changePosArr = this.dotsPos.map(_ => changePos)
+    } else {
+      changePosArr[index] = changePos
     }
 
-    const changePos = pos - curPos
+    // 最小范围模式中
+    // if (this.minRange) {
+    // }
 
     // 没有变化则不更新位置
     if (!changePos) {
       return false
     }
 
-    const newDotsPos: number[] = []
-    // 固定模式下，同步更新其他滑块的位置，若有滑块超过范围，则不更新位置
-    if (this.fixed && this.dotsPos.some((originPos, i) => {
-        if (i !== index) {
-          const { pos: lastPos, inRange } = this.$refs.dot[i].getPos(originPos + changePos)
-          newDotsPos[i] = lastPos
-          return !inRange
-        }
-        newDotsPos[i] = pos
-        return false
-      })
-    ) {
-      return false
-    }
-
-    this.dotsPos = newDotsPos
+    this.dotsPos = this.dotsPos.map((curPos, i) => curPos + (changePosArr[i] || 0))
   }
 
   // 拖拽开始
@@ -403,7 +406,7 @@ export default class VueSlider extends Vue {
     }
     this.$emit('drag-end')
     this.animateTime = 0
-    this.dotsPos = [...this.dotsPos].sort()
+    this.dotsPos = [...this.dotsPos].sort((a, b) => a - b)
     this.$nextTick(() => {
       this.syncPosByValue(this.speed)
     })
