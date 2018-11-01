@@ -1,13 +1,14 @@
 <template>
   <div id="app">
     <vue-slider
+      v-show="show"
       class="slider"
       v-model="value"
       v-bind="sliderOptions"
       @error="({ type, message }) => log('error', type, message)"
     >
     </vue-slider>
-    <h1>{{ value }}</h1>
+    <h1 @click="show = !show">{{ value }}</h1>
   </div>
 </template>
 
@@ -21,16 +22,18 @@ import VueSlider from '../lib'
   },
 })
 export default class App extends Vue {
-  value = 0
+  value = [1, 10]
+  show = true
 
   sliderOptions = {
-    width: 280,
+    width: 400,
     height: 8,
     min: 0,
-    max: 9,
-    interval: 3,
+    max: 99,
+    interval: 1,
+    fixed: true,
     // interval: 2,
-    // data: ['01', '02', '03', '04', '05', '10'],
+    // data: ['01', '02', '03', '04', '05', '06'],
     // marks: {
     //   '-10': '10℃',
     //   0: '0',

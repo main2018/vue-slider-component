@@ -10,6 +10,7 @@
     <!-- dots -->
     <vue-slider-dot
       v-for="(dotPos, index) in dotsPos"
+      ref="dot"
       :key="index"
       :dot-size="dotSize"
       :scale="scale"
@@ -18,10 +19,12 @@
       :disabled="false"
       :dot-style="dotStyle"
       :style="[dotBaseStyle, {
-        [mainDirection]: `${dotPos}%`
+        [mainDirection]: `${dotPos}%`,
+        transition: `${mainDirection} ${animateTime}s`
       }]"
+      :range="valuePosRange[index]"
       @drag-start="dragStart"
-      @dragging="pos => dragMove(pos, index)"
+      @dragging="({ pos }) => dragMove(pos, index)"
       @drag-end="dragEnd"
       @click.native.stop
     >
@@ -57,7 +60,7 @@ export const enum ERROR_TYPE {
 
 const ERROR_MSG = {
   [ERROR_TYPE.VALUE]: 'The type of the "value" is illegal',
-  [ERROR_TYPE.INTERVAL]: 'The prop "interval" is invalid, please ensure that (max - min) can be divisible by "interval"',
+  [ERROR_TYPE.INTERVAL]: 'The prop "interval" is invalid, "(max - min)" cannot be divisible by "interval"',
   [ERROR_TYPE.MIN]: 'The "value" cannot be less than the minimum.',
   [ERROR_TYPE.MAX]: 'The "value" cannot be greater than the maximum.',
 }
@@ -72,9 +75,11 @@ const DEFAULT_SLIDER_SIZE = 6
 export default class VueSlider extends Vue {
   dotsPos: number[] = []
   scale: number = 1 // 比例，1% = ${scale}px
+  animateTime: number = 0
 
   $refs!: {
-    container: HTMLDivElement
+    container: HTMLDivElement,
+    dot: VueSliderDot[],
   }
 
   // slider value
@@ -113,6 +118,10 @@ export default class VueSlider extends Vue {
   @Prop({ default: 1 })
   interval!: number
 
+  // 运动速度
+  @Prop({ default: 0.5 })
+  speed!: number
+
   // 自定义数据
   @Prop({ default: null })
   data!: TValue[] | null
@@ -120,6 +129,26 @@ export default class VueSlider extends Vue {
   // 是否懒同步值
   @Prop({ default: false })
   lazy!: boolean
+
+  // 初始化时候是否有过渡动画
+  @Prop({ default: false })
+  startAnimation!: boolean
+
+  // 是否允许滑块交叉
+  @Prop({ default: true })
+  enableCross!: boolean
+
+  // 是否固定滑块见间隔
+  @Prop({ default: false })
+  fixed!: boolean
+
+  // 滑块之间的最小距离
+  @Prop()
+  minRange!: number
+
+  // 滑块之间的最大距离
+  @Prop()
+  maxRange!: number
 
   // dot tyle
   @Prop()
@@ -200,8 +229,68 @@ export default class VueSlider extends Vue {
     return this.direction === 'rtl' || this.direction === 'ttb'
   }
 
+  // 所有可用值的个数
+  get total(): number {
+    let total = 0
+    if (this.data) {
+      total = this.data.length - 1
+    } else {
+      total = new Decimal(this.max).minusChain(this.min).divide(this.interval)
+    }
+    if (total - Math.floor(total) !== 0) {
+      this.emitError(ERROR_TYPE.INTERVAL)
+      return 0
+    }
+    return total
+  }
+
+  // 每个可用值之间的距离
+  get gap(): number {
+    return 100 / this.total
+  }
+
+  // 每个可用值的位置
+  get valuePos(): number[] {
+    const gap = this.gap
+    return Array.from(new Array(this.total), (_, index) => {
+      return index * gap
+    }).concat([100])
+  }
+
+  // 两个滑块最小的距离
+  get minRangeDir(): number {
+    return this.minRange ? this.minRange * this.gap : 0
+  }
+
+  // 两个滑块最大的距离
+  get maxRangeDir(): number {
+    return this.maxRange ? this.maxRange * this.gap : 100
+  }
+
+  // 每个滑块的滑动范围
+  get valuePosRange(): Array<[number, number]> {
+    const dotsPos = this.dotsPos
+    const valuePosRange: Array<[number, number]> = []
+
+    dotsPos.forEach((pos, i) => {
+      const prevPos = valuePosRange[i - 1] || [0, 100]
+      valuePosRange.push([
+        this.minRange ?
+          prevPos[0] + this.minRangeDir :
+          !this.enableCross ?
+          dotsPos[i - 1] || 0 :
+          0,
+        !this.enableCross ?
+          dotsPos[i + 1] || 100 :
+          100,
+      ])
+    })
+
+    return valuePosRange
+  }
+
   mounted() {
-    this.dotsPos = Array.isArray(this.value) ? this.value.map(v => this.parseValue(v)) : [this.parseValue(this.value)]
+    this.syncPosByValue(this.startAnimation ? this.speed : 0)
   }
 
   getScale() {
@@ -210,11 +299,7 @@ export default class VueSlider extends Vue {
 
   // 计算出滑块的位置
   parseValue(val: TValue): number {
-    let min = this.min
-    let max = this.max
     if (this.data) {
-      min = 0
-      max = this.data.length - 1
       val = this.data.indexOf(val)
     } else if (typeof val === 'number') {
       if (val < this.min) {
@@ -223,41 +308,34 @@ export default class VueSlider extends Vue {
       if (val > this.max) {
         return this.emitError(ERROR_TYPE.MAX)
       }
-      val = new Decimal(val).minus(min)
+      val = new Decimal(val).minusChain(this.min).divide(this.interval)
     }
 
     if (typeof val !== 'number') {
       return this.emitError(ERROR_TYPE.VALUE)
     }
 
-    return new Decimal(val).divide(new Decimal(max).minus(min)) * 100
+    return this.valuePos[val]
   }
 
   // 通过位置计算出值
   parsePos(pos: number): TValue {
-    let gap = 0
-    if (this.data) {
-      gap = this.data.length
-    } else {
-      gap = new Decimal(this.max).minusChain(this.min).divide(this.interval)
-    }
-    if (gap - Math.floor(gap) !== 0) {
-      this.emitError(ERROR_TYPE.INTERVAL)
-      return 0
-    }
-    const gapPos = 100 / gap
-    const index = Math.round(pos / gapPos)
-    return this.data ? this.data[index] : new Decimal(index).multiplyChain(this.interval).plus(this.min)
+    const index = Math.round(pos / this.gap)
+    return this.data ?
+      this.data[index] :
+      new Decimal(index).multiplyChain(this.interval).plus(this.min)
+  }
+
+  // 同步滑块位置
+  syncPosByValue(speed: number = 0) {
+    this.dotsPos = Array.isArray(this.value) ? this.value.map(v => this.parseValue(v)) : [this.parseValue(this.value)]
+    this.animateTime = speed
   }
 
   // 同步值
   syncValueByPos() {
-    const values = this.dotsPos.map(pos => this.parsePos(pos))
+    const values = [...this.dotsPos].sort().map(pos => this.parsePos(pos))
     this.$emit('change', values.length === 1 ? values[0] : values)
-  }
-
-  dotPosChanged(pos: number, index: number) {
-    this.dotsPos = this.dotsPos.map((p, i) => i === index ? pos : p).sort()
   }
 
   // 返回错误
@@ -269,23 +347,66 @@ export default class VueSlider extends Vue {
     return type
   }
 
+  // 设置单个滑块的位置
+  setDotPos(pos: number, index: number) {
+    // 滑块变化的距离
+    const curPos = this.dotsPos.find((_, i) => i === index)
+    if (curPos === undefined) {
+      return false
+    }
+
+    const changePos = pos - curPos
+
+    // 没有变化则不更新位置
+    if (!changePos) {
+      return false
+    }
+
+    const newDotsPos: number[] = []
+    // 固定模式下，同步更新其他滑块的位置，若有滑块超过范围，则不更新位置
+    if (this.fixed && this.dotsPos.some((originPos, i) => {
+        if (i !== index) {
+          const { pos: lastPos, inRange } = this.$refs.dot[i].getPos(originPos + changePos)
+          newDotsPos[i] = lastPos
+          return !inRange
+        }
+        newDotsPos[i] = pos
+        return false
+      })
+    ) {
+      return false
+    }
+
+    this.dotsPos = newDotsPos
+  }
+
   // 拖拽开始
   dragStart() {
     this.getScale()
     this.$emit('drag-start')
+    this.animateTime = 0
   }
 
   // 拖拽中
   dragMove(pos: number, index: number) {
-    this.dotPosChanged(pos, index)
-    !this.lazy && this.syncValueByPos()
+    this.setDotPos(pos, index)
+    if (!this.lazy) {
+      this.syncValueByPos()
+    }
     this.$emit('dragging')
   }
 
   // 拖拽结束
   dragEnd() {
+    if (this.lazy) {
+      this.syncValueByPos()
+    }
     this.$emit('drag-end')
-    this.lazy && this.syncValueByPos()
+    this.animateTime = 0
+    this.dotsPos = [...this.dotsPos].sort()
+    this.$nextTick(() => {
+      this.syncPosByValue(this.speed)
+    })
   }
 
   clickHandle() {
