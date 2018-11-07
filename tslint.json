@@ -20,6 +20,13 @@
     "interface-name": false,
     "ordered-imports": false,
     "object-literal-sort-keys": false,
-    "no-consecutive-blank-lines": false
+    "no-consecutive-blank-lines": false,
+    "member-ordering": [true, {
+      "order": [
+        "private-constructor",
+        "public-constructor",
+        "private-public"
+      ]
+    }]
   }
 }

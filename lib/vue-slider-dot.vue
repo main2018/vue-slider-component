@@ -21,7 +21,7 @@
 
 <script lang="ts">
 import { Component, Model, Prop, Watch, Vue } from 'vue-property-decorator'
-import { TValue } from './vue-slider.vue'
+import { TValue } from './utils/control'
 import { getPos } from './utils'
 
 export const enum DotState {
@@ -45,9 +45,6 @@ export default class VueSliderDot extends Vue {
     dot: HTMLDivElement
   }
 
-  @Prop({ default: 0 })
-  scale!: number
-
   // slider value
   @Prop({ default: 0 })
   value!: TValue
@@ -59,10 +56,6 @@ export default class VueSliderDot extends Vue {
   // dot 样式
   @Prop()
   dotStyle?: CSSStyleDeclaration
-
-  // 滑动范围
-  @Prop({ default: () => [0, 100] })
-  range!: [number, number]
 
   // 是否禁用状态
   @Prop({ default: false })
@@ -128,8 +121,7 @@ export default class VueSliderDot extends Vue {
     }
 
     const pos = getPos(e, (this.$parent.$el as HTMLDivElement))
-    const changePos = pos.x / this.scale
-    this.$emit('dragging', this.getPos(changePos))
+    this.$emit('dragging', pos)
   }
 
   // 拖拽结束
@@ -137,24 +129,6 @@ export default class VueSliderDot extends Vue {
     if (this.states & DotState.Drag) {
       this.deleteState(DotState.Drag)
       this.$emit('drag-end')
-    }
-  }
-
-  // 得到最后滑块位置
-  getPos(changePos: number): { pos: number, inRange: boolean } {
-    const range = this.range
-    let pos = changePos
-    let inRange = true
-    if (changePos < range[0]) {
-      pos = range[0]
-      inRange = false
-    } else if (changePos > range[1]) {
-      pos = range[1]
-      inRange = false
-    }
-    return {
-      pos,
-      inRange
     }
   }
 }
