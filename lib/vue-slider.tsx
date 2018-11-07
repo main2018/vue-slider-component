@@ -1,50 +1,11 @@
-<template>
-  <div
-    v-show="show"
-    ref="container"
-    :class="containerClasses"
-    :style="containerStyles"
-    @click="clickHandle"
-    aria-hidden="true"
-  >
-    <!-- dots -->
-    <vue-slider-dot
-      v-for="(dot, index) in dots"
-      ref="dot"
-      :key="index"
-      :dot-size="dotSize"
-      :value="dot"
-      :tooltip="true"
-      :disabled="false"
-      :dot-style="dotStyle"
-      :style="[dotBaseStyle, {
-        [mainDirection]: `${dot.pos}%`,
-        transition: `${mainDirection} ${animateTime}s`
-      }]"
-      @drag-start="dragStart"
-      @dragging="(pos) => dragMove(pos, index)"
-      @drag-end="dragEnd"
-      @click.native.stop
-    >
-      <slot
-        name="dot"
-        :value="value"
-        :disabled="false"
-      />
-    </vue-slider-dot>
-
-    <!-- piecewise -->
-    <!-- <piecewise /> -->
-  </div>
-</template>
-
-<script lang="ts">
 import { Component, Model, Prop, Vue } from 'vue-property-decorator'
-import VueSliderDot from './vue-slider-dot.vue'
+import VueSliderDot from './vue-slider-dot'
 
 import { toPx } from './utils'
 import Decimal from './utils/decimal'
 import Control, { TValue, ERROR_TYPE } from './utils/control'
+
+import './styles/slider.scss'
 
 export type TDirection = 'ltr' | 'rtl' | 'ttb' | 'btt'
 
@@ -275,7 +236,7 @@ export default class VueSlider extends Vue {
   // 拖拽开始
   private dragStart() {
     this.getScale()
-    this.$emit('drag-start')
+    this.$emit('dragStart')
     this.animateTime = 0
   }
 
@@ -294,8 +255,9 @@ export default class VueSlider extends Vue {
     if (this.lazy) {
       this.syncValueByPos()
     }
-    this.$emit('drag-end')
+    this.$emit('dragEnd')
     this.animateTime = 0
+    this.dots = this.control.getDots(true)
     // this.dotsPos = [...this.dotsPos].sort((a, b) => a - b)
     this.$nextTick(() => {
       this.syncPosByValue(this.speed)
@@ -305,9 +267,45 @@ export default class VueSlider extends Vue {
   private clickHandle() {
     console.log('click')
   }
-}
-</script>
 
-<style lang="scss">
-  @import './styles/slider';
-</style>
+  render() {
+    return (
+      <div
+        v-show={this.show}
+        ref='container'
+        class={this.containerClasses}
+        style={this.containerStyles}
+        onClick={this.clickHandle}
+        aria-hidden={true}
+      >
+        {
+          this.dots.map((dot, index) => (
+            <vue-slider-dot
+              ref='dot'
+              key={index}
+              dotSize={this.dotSize}
+              value={dot.pos}
+              tooltip={true}
+              disabled={false}
+              dot-style={this.dotStyle}
+              style={[this.dotBaseStyle, {
+                [this.mainDirection]: `${dot.pos}%`,
+                transition: `${this.mainDirection} ${this.animateTime}s`
+              }]}
+              onDragStart={this.dragStart}
+              onDragging={(pos: IPosObject) => this.dragMove(pos, index)}
+              onDragEnd={this.dragEnd}
+              onClick={(e: Event) => e.preventDefault()}
+            >
+              <slot
+                name='dot'
+                value={this.value}
+                disabled={false}
+              />
+            </vue-slider-dot>
+          ))
+        }
+      </div>
+    )
+  }
+}

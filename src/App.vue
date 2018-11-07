@@ -22,7 +22,7 @@ import VueSlider from '../lib'
   },
 })
 export default class App extends Vue {
-  value = [1, 20]
+  value = [1, 20, 88]
   show = true
 
   sliderOptions = {

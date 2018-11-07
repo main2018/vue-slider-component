@@ -1,28 +1,8 @@
-<template>
-  <div
-    ref="dot"
-    :class="dotClasses"
-    @mousedown="dragStart"
-    @touchstart="dragStart"
-  >
-    <slot
-      :value="value"
-      :disabled="disabled"
-    >
-      <div
-        class="vue-slider-dot-handle"
-        :style="[
-          dotStyle,
-        ]"
-      ></div>
-    </slot>
-  </div>
-</template>
-
-<script lang="ts">
 import { Component, Model, Prop, Watch, Vue } from 'vue-property-decorator'
 import { TValue } from './utils/control'
 import { getPos } from './utils'
+
+import './styles/dot.scss'
 
 export const enum DotState {
   None   = 0,
@@ -111,7 +91,7 @@ export default class VueSliderDot extends Vue {
     }
 
     this.setState(DotState.Drag)
-    this.$emit('drag-start')
+    this.$emit('dragStart')
   }
 
   // 拖拽中
@@ -128,26 +108,28 @@ export default class VueSliderDot extends Vue {
   dragEnd() {
     if (this.states & DotState.Drag) {
       this.deleteState(DotState.Drag)
-      this.$emit('drag-end')
+      this.$emit('dragEnd')
     }
   }
-}
-</script>
 
-<style lang="scss">
-  // dot
-  .vue-slider-dot {
-    position: absolute;
-    cursor: pointer;
-    will-change: transform;
-    transition: all 0s;
-    z-index: 5;
+  render() {
+    return (
+      <div
+        ref='dot'
+        class={this.dotClasses}
+        onMousedown={this.dragStart}
+        onTouchstart={this.dragStart}
+      >
+        <slot
+          value={this.value}
+          disabled={this.disabled}
+        >
+          <div
+            class='vue-slider-dot-handle'
+            style={this.dotStyle}
+          ></div>
+        </slot>
+      </div>
+    )
   }
-  .vue-slider-dot-handle {
-    width: 100%;
-    height: 100%;
-    border-radius: 50%;
-    background-color: rgba(0, 0, 0, .2);
-    box-shadow: 0.5px 0.5px 2px 1px rgba(0, 0, 0, 0.32);
-  }
-</style>
+}

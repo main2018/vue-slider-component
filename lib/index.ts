@@ -1,5 +1,5 @@
-import VueSlider from './vue-slider.vue'
-import VueSliderDot from './vue-slider-dot.vue'
+import VueSlider from './vue-slider'
+import VueSliderDot from './vue-slider-dot'
 
 export {
   VueSliderDot,

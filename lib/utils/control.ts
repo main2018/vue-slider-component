@@ -43,11 +43,21 @@ export default class Control {
       : [this.parseValue(this.value)]
   }
 
-  // 得到所有点的数据
-  getDots(): Array<{ pos: number, value: number }> {
-    return this.dotsPos.map(pos => ({
+  /**
+   * 得到所有点的数据
+   *
+   * @param {boolean} isSortDotsPos 是否排序点的位置
+   * @returns {Array<{ pos: number, value: TValue }>}
+   * @memberof Control
+   */
+  getDots(isSortDotsPos?: boolean): Array<{ pos: number, value: TValue }> {
+    let list = [...this.dotsPos].sort((a, b) => a - b)
+    if (isSortDotsPos) {
+      this.dotsPos = list
+    }
+    return list.map(pos => ({
       pos,
-      value: pos
+      value: this.parsePos(pos)
     }))
   }
 
@@ -60,8 +70,7 @@ export default class Control {
   setDotPos(pos: number, index: number) {
     // 滑块变化的距离
 
-    console.log(pos, this.scale, this.dotsPos[index])
-    let changePos = (pos / this.scale) - this.dotsPos[index]
+    let changePos = (this.getValidPos(pos / this.scale, index).pos) - this.dotsPos[index]
     let changePosArr: number[] = new Array(this.dotsPos.length)
 
     // 固定模式下，同步更新其他滑块的位置，若有滑块超过范围，则不更新位置
