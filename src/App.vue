@@ -22,7 +22,8 @@ import VueSlider from '../lib'
   },
 })
 export default class App extends Vue {
-  value = [1, 20, 88]
+  // value = [1, 20, 88]
+  value = ['01', '03']
   show = true
 
   sliderOptions = {
@@ -31,10 +32,11 @@ export default class App extends Vue {
     min: 0,
     max: 99,
     interval: 1,
+    // direction: 'rtl',
     // fixed: true,
     // minRange: 20,
     // interval: 2,
-    // data: ['01', '02', '03', '04', '05', '06'],
+    data: ['01', '02', '03', '04', '05', '06'],
     // marks: {
     //   '-10': '10℃',
     //   0: '0',

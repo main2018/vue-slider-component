@@ -19,9 +19,10 @@ const ERROR_MSG = {
 export default class Control {
   scale: number = 1 // 比例，1% = ${scale}px
   dotsPos: number[] = [] // 每个点的位置
+  dotsValue: TValue[] = [] // 每个点的值
 
   constructor(
-    private value: TValue | TValue[],
+    value: TValue | TValue[],
     private data: TValue[] | null,
     private enableCross: boolean,
     private fixed: boolean,
@@ -32,32 +33,42 @@ export default class Control {
     private maxRange?: number,
     private onError?: (type: ERROR_TYPE, message: string) => void
   ) {
-    this.initDotsPos()
+    this.setValue(value)
   }
 
-  // 初始化所有点的位置
-  initDotsPos() {
-    this.dotsPos =
-      Array.isArray(this.value)
-      ? this.value.map(v => this.parseValue(v))
-      : [this.parseValue(this.value)]
+  // 设置滑块的值
+  setValue(value: TValue | TValue[]) {
+    this.dotsValue = Array.isArray(value) ? value : [value]
+    this.syncDotsPos()
+  }
+
+  // 设置滑块位置
+  setDotsPos(dotsPos: number[]) {
+    const list = [...dotsPos].sort((a, b) => a - b)
+    this.dotsPos = dotsPos
+    this.dotsValue = list.map(dotPos => this.parsePos(dotPos))
+  }
+
+  // 排序滑块位置
+  sortDotsPos() {
+    this.dotsPos = [...this.dotsPos].sort((a, b) => a - b)
+  }
+
+  // 同步滑块位置
+  syncDotsPos() {
+    this.dotsPos = this.dotsValue.map(v => this.parseValue(v))
   }
 
   /**
-   * 得到所有点的数据
+   * 得到所有滑块的数据
    *
-   * @param {boolean} isSortDotsPos 是否排序点的位置
    * @returns {Array<{ pos: number, value: TValue }>}
    * @memberof Control
    */
-  getDots(isSortDotsPos?: boolean): Array<{ pos: number, value: TValue }> {
-    let list = [...this.dotsPos].sort((a, b) => a - b)
-    if (isSortDotsPos) {
-      this.dotsPos = list
-    }
-    return list.map(pos => ({
+  getDots(): Array<{ pos: number, value: TValue }> {
+    return this.dotsPos.map((pos, index) => ({
       pos,
-      value: this.parsePos(pos)
+      value: this.dotsValue[index]
     }))
   }
 
@@ -69,8 +80,13 @@ export default class Control {
    */
   setDotPos(pos: number, index: number) {
     // 滑块变化的距离
+    let changePos = ((this.getValidPos(pos, index).pos) - this.dotsPos[index])
 
-    let changePos = (this.getValidPos(pos / this.scale, index).pos) - this.dotsPos[index]
+    // 没有变化则不更新位置
+    if (!changePos) {
+      return false
+    }
+
     let changePosArr: number[] = new Array(this.dotsPos.length)
 
     // 固定模式下，同步更新其他滑块的位置，若有滑块超过范围，则不更新位置
@@ -79,7 +95,7 @@ export default class Control {
         if (i !== index) {
           const { pos: lastPos, inRange } = this.getValidPos(originPos + changePos, i)
           if (!inRange) {
-            changePos = Math[changePos < 0 ? 'max' : 'min'](lastPos - originPos, changePos)
+            changePos = Math.min(Math.abs(lastPos - originPos), Math.abs(changePos)) * (changePos < 0 ? -1 : 1)
           }
         }
       })
@@ -89,15 +105,25 @@ export default class Control {
     }
 
     // 最小范围模式中
-    // if (this.minRange) {
+    // if (!this.fixed && this.minRange) {
+    //   if (changePos > 0) {
+
+    //   }
     // }
 
-    // 没有变化则不更新位置
-    if (!changePos) {
-      return false
-    }
+    this.setDotsPos(this.dotsPos.map((curPos, i) => curPos + (changePosArr[i] || 0)))
+  }
 
-    this.dotsPos = this.dotsPos.map((curPos, i) => curPos + (changePosArr[i] || 0))
+  /**
+   * 通过位置得到最近的一个滑块索引
+   *
+   * @param {number} pos
+   * @returns {number}
+   * @memberof Control
+   */
+  getRecentDot(pos: number): number {
+    const arr = this.dotsPos.map(dotPos => Math.abs(dotPos - pos))
+    return arr.indexOf(Math.min(...arr))
   }
 
   /**
@@ -105,7 +131,7 @@ export default class Control {
    *
    * @private
    * @param {number} newPos 新的滑块位置
-   * @param {number} index 滑块所有
+   * @param {number} index 滑块索引
    * @returns {{ pos: number, inRange: boolean }}
    */
   private getValidPos(newPos: number, index: number): { pos: number, inRange: boolean } {

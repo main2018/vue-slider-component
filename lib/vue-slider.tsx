@@ -1,13 +1,19 @@
 import { Component, Model, Prop, Vue } from 'vue-property-decorator'
 import VueSliderDot from './vue-slider-dot'
 
-import { toPx } from './utils'
+import { toPx, getPos } from './utils'
 import Decimal from './utils/decimal'
 import Control, { TValue, ERROR_TYPE } from './utils/control'
+import State, { StateMap } from './utils/state'
 
 import './styles/slider.scss'
 
 export type TDirection = 'ltr' | 'rtl' | 'ttb' | 'btt'
+
+export const SliderState: StateMap = {
+  None: 0,
+  Drag: 1 << 0,
+}
 
 export interface IDot {
   pos: number,
@@ -29,6 +35,7 @@ const DEFAULT_SLIDER_SIZE = 6
 export default class VueSlider extends Vue {
   private control!: Control
   private animateTime: number = 0
+  private states: State = new State(SliderState)
   dots: IDot[] = []
 
   $refs!: {
@@ -194,7 +201,9 @@ export default class VueSlider extends Vue {
   }
 
   getScale() {
-    this.control.scale = new Decimal(~~this.$refs.container.offsetWidth).divide(100)
+    this.control.scale = new Decimal(
+      Math.floor(this.isHorizontal ? this.$el.offsetWidth : this.$el.offsetHeight)
+    ).divide(100)
   }
 
   initControl() {
@@ -220,7 +229,6 @@ export default class VueSlider extends Vue {
 
   // 同步值
   private syncValueByPos() {
-    // const values = [...this.dotsPos].sort((a, b) => a - b).map(pos => this.parsePos(pos))
     const values = this.dots.map(dot => dot.value)
     this.$emit('change', values.length === 1 ? values[0] : values)
   }
@@ -236,13 +244,13 @@ export default class VueSlider extends Vue {
   // 拖拽开始
   private dragStart() {
     this.getScale()
+    this.states.add(SliderState.Drag)
     this.$emit('dragStart')
-    this.animateTime = 0
   }
 
   // 拖拽中
-  private dragMove(pos: IPosObject, index: number) {
-    this.control.setDotPos(this.isHorizontal ? pos.x : pos.y, index)
+  private dragMove(e: MouseEvent | TouchEvent, index: number) {
+    this.control.setDotPos(this.getPosByEvent(e), index)
     this.syncPosByValue()
     if (!this.lazy) {
       this.syncValueByPos()
@@ -255,24 +263,39 @@ export default class VueSlider extends Vue {
     if (this.lazy) {
       this.syncValueByPos()
     }
+    this.states.delete(SliderState.Drag)
     this.$emit('dragEnd')
-    this.animateTime = 0
-    this.dots = this.control.getDots(true)
-    // this.dotsPos = [...this.dotsPos].sort((a, b) => a - b)
+
+    // NOTE: 滑块交叉后恢复滑块顺序位置
+    this.control.sortDotsPos()
+    this.syncPosByValue()
+
     this.$nextTick(() => {
+      // NOTE: 拖拽完毕后同步滑块的位置
+      this.control.syncDotsPos()
       this.syncPosByValue(this.speed)
     })
   }
 
-  private clickHandle() {
-    console.log('click')
+  private clickHandle(e: MouseEvent | TouchEvent) {
+    // if (this.states.has(SliderState.Drag)) {
+    //   console.log(this.states.has(SliderState.Drag))
+    //   this.states.delete(SliderState.Drag)
+    // }
+    // const pos = this.getPosByEvent(e)
+    // const index = this.control.getRecentDot(pos)
+    // this.control.setDotPos(pos, index)
+    // this.syncPosByValue(this.speed)
+  }
+
+  private getPosByEvent(e: MouseEvent | TouchEvent): number {
+    return getPos(e, (this.$el as HTMLDivElement), this.isReverse)[this.isHorizontal ? 'x' : 'y'] / this.control.scale
   }
 
   render() {
     return (
       <div
         v-show={this.show}
-        ref='container'
         class={this.containerClasses}
         style={this.containerStyles}
         onClick={this.clickHandle}
@@ -287,21 +310,20 @@ export default class VueSlider extends Vue {
               value={dot.pos}
               tooltip={true}
               disabled={false}
+              isReverse={this.isReverse}
               dot-style={this.dotStyle}
               style={[this.dotBaseStyle, {
                 [this.mainDirection]: `${dot.pos}%`,
                 transition: `${this.mainDirection} ${this.animateTime}s`
               }]}
               onDragStart={this.dragStart}
-              onDragging={(pos: IPosObject) => this.dragMove(pos, index)}
+              onDragging={(e: MouseEvent | TouchEvent) => this.dragMove(e, index)}
               onDragEnd={this.dragEnd}
-              onClick={(e: Event) => e.preventDefault()}
             >
-              <slot
-                name='dot'
-                value={this.value}
-                disabled={false}
-              />
+              {this.$scopedSlots.dot ? this.$scopedSlots.dot({
+                value: dot.value,
+                disabled: true
+              }) : null}
             </vue-slider-dot>
           ))
         }

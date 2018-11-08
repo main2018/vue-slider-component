@@ -1,14 +1,14 @@
 import { Component, Model, Prop, Watch, Vue } from 'vue-property-decorator'
 import { TValue } from './utils/control'
-import { getPos } from './utils'
+import State, { StateMap } from './utils/state'
 
 import './styles/dot.scss'
 
-export const enum DotState {
-  None   = 0,
-  Drag   = 1 << 0,
-  FOCUS  = 1 << 1,
-  KEY    = 1 << 2
+export const DotState: StateMap = {
+  None  : 0,
+  Drag  : 1 << 0,
+  FOCUS : 1 << 1,
+  KEY   : 1 << 2
 }
 
 export interface DotPos {
@@ -18,7 +18,7 @@ export interface DotPos {
 
 @Component
 export default class VueSliderDot extends Vue {
-  states: DotState = DotState.None
+  states: State = new State(DotState)
   wrapWidth: number = 0
 
   $refs!: {
@@ -33,6 +33,10 @@ export default class VueSliderDot extends Vue {
   @Prop({ default: 16 })
   dotSize!: number | [number, number]
 
+  // the direction of the slider
+  @Prop({ default: false })
+  isReverse!: boolean
+
   // dot 样式
   @Prop()
   dotStyle?: CSSStyleDeclaration
@@ -45,7 +49,7 @@ export default class VueSliderDot extends Vue {
     return [
       'vue-slider-dot',
       {
-        'vue-slider-dot-drag': this.states & DotState.Drag
+        'vue-slider-dot-drag': this.states.has(DotState.Drag)
       }
     ]
   }
@@ -74,40 +78,29 @@ export default class VueSliderDot extends Vue {
     document.removeEventListener('mouseleave', this.dragEnd)
   }
 
-  // 设置滑块状态
-  setState(state: DotState) {
-    this.states |= state
-  }
-
-  // 移除滑块状态
-  deleteState(state: DotState) {
-    this.states &= ~state
-  }
-
   // 拖拽开始
   dragStart(e: MouseEvent | TouchEvent) {
     if (this.disabled) {
       return false
     }
 
-    this.setState(DotState.Drag)
+    this.states.add(DotState.Drag)
     this.$emit('dragStart')
   }
 
   // 拖拽中
   dragMove(e: MouseEvent | TouchEvent) {
-    if (!(this.states & DotState.Drag)) {
+    if (!this.states.has(DotState.Drag)) {
       return false
     }
 
-    const pos = getPos(e, (this.$parent.$el as HTMLDivElement))
-    this.$emit('dragging', pos)
+    this.$emit('dragging', e)
   }
 
   // 拖拽结束
   dragEnd() {
-    if (this.states & DotState.Drag) {
-      this.deleteState(DotState.Drag)
+    if (this.states.has(DotState.Drag)) {
+      this.states.delete(DotState.Drag)
       this.$emit('dragEnd')
     }
   }
@@ -120,15 +113,12 @@ export default class VueSliderDot extends Vue {
         onMousedown={this.dragStart}
         onTouchstart={this.dragStart}
       >
-        <slot
-          value={this.value}
-          disabled={this.disabled}
-        >
+        {this.$slots.default || (
           <div
             class='vue-slider-dot-handle'
             style={this.dotStyle}
           ></div>
-        </slot>
+        )}
       </div>
     )
   }
