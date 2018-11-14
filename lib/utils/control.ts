@@ -1,31 +1,30 @@
-import Decimal from './decimal';
+import Decimal from './decimal'
 
-export type TValue = number | string | symbol;
+export type TValue = number | string | symbol
 
 export interface Marks {
-  [key: string]: string | { label?: string; style?: CSSStyleDeclaration };
+  [key: string]: string | { label?: string; style?: CSSStyleDeclaration }
 }
 
 export const enum ERROR_TYPE {
   VALUE = 1, // 值的类型不正确
   INTERVAL, // interval 不合法
   MIN, // 超过最小值
-  MAX
+  MAX,
 }
 
 const ERROR_MSG = {
   [ERROR_TYPE.VALUE]: 'The type of the "value" is illegal',
-  [ERROR_TYPE.INTERVAL]:
-    'The prop "interval" is invalid, "(max - min)" cannot be divisible by "interval"',
+  [ERROR_TYPE.INTERVAL]: 'The prop "interval" is invalid, "(max - min)" cannot be divisible by "interval"',
   [ERROR_TYPE.MIN]: 'The "value" cannot be less than the minimum.',
-  [ERROR_TYPE.MAX]: 'The "value" cannot be greater than the maximum.'
-};
+  [ERROR_TYPE.MAX]: 'The "value" cannot be greater than the maximum.',
+}
 
 export default class Control {
-  scale: number = 1; // 比例，1% = ${scale}px
-  dotsPos: number[] = []; // 每个滑块的位置
-  dotsValue: TValue[] = []; // 每个滑块的值
-  inDrag: boolean = false; // 是否拖拽状态 (拖拽状态下，滑块顺序不排序)
+  scale: number = 1 // 比例，1% = ${scale}px
+  dotsPos: number[] = [] // 每个滑块的位置
+  dotsValue: TValue[] = [] // 每个滑块的值
+  inDrag: boolean = false // 是否拖拽状态 (拖拽状态下，滑块顺序不排序)
 
   constructor(
     value: TValue | TValue[],
@@ -40,35 +39,35 @@ export default class Control {
     private marks?: boolean | Marks,
     private onError?: (type: ERROR_TYPE, message: string) => void
   ) {
-    this.setValue(value);
+    this.setValue(value)
   }
 
   // 设置是否拖拽状态中
   setDragState(inDrag: boolean) {
-    this.inDrag = inDrag;
+    this.inDrag = inDrag
   }
 
   // 设置滑块的值
   setValue(value: TValue | TValue[]) {
-    this.dotsValue = Array.isArray(value) ? value : [value];
-    this.syncDotsPos();
+    this.dotsValue = Array.isArray(value) ? value : [value]
+    this.syncDotsPos()
   }
 
   // 设置滑块位置
   setDotsPos(dotsPos: number[], isDrag: boolean = true) {
-    const list = [...dotsPos].sort((a, b) => a - b);
-    this.dotsPos = isDrag ? dotsPos : list;
-    this.dotsValue = list.map(dotPos => this.parsePos(dotPos));
+    const list = [...dotsPos].sort((a, b) => a - b)
+    this.dotsPos = isDrag ? dotsPos : list
+    this.dotsValue = list.map(dotPos => this.parsePos(dotPos))
   }
 
   // 排序滑块位置
   sortDotsPos() {
-    this.dotsPos = [...this.dotsPos].sort((a, b) => a - b);
+    this.dotsPos = [...this.dotsPos].sort((a, b) => a - b)
   }
 
   // 同步滑块位置
   syncDotsPos() {
-    this.dotsPos = this.dotsValue.map(v => this.parseValue(v));
+    this.dotsPos = this.dotsValue.map(v => this.parseValue(v))
   }
 
   // 得到所有标志
@@ -84,28 +83,29 @@ export default class Control {
    */
   setDotPos(pos: number, index?: number) {
     if (index === void 0) {
-      index = this.getRecentDot(pos);
+      index = this.getRecentDot(pos)
     }
     // 滑块变化的距离
-    const changePos = this.getValidPos(pos, index).pos - this.dotsPos[index];
+    pos = this.getValidPos(pos, index).pos
+    const changePos = pos - this.dotsPos[index]
 
     // 没有变化则不更新位置
     if (!changePos) {
-      return false;
+      return false
     }
 
-    let changePosArr: number[] = new Array(this.dotsPos.length);
+    let changePosArr: number[] = new Array(this.dotsPos.length)
     if (this.fixed) {
-      changePosArr = this.getFixedChangePosArr(changePos, index);
+      changePosArr = this.getFixedChangePosArr(changePos, index)
     } else if (this.minRange || this.maxRange) {
-      changePosArr = this.getLimitRangeChangePosArr(pos, changePos, index);
+      changePosArr = this.getLimitRangeChangePosArr(pos, changePos, index)
     } else {
-      changePosArr[index] = changePos;
+      changePosArr[index] = changePos
     }
 
     this.setDotsPos(
       this.dotsPos.map((curPos, i) => curPos + (changePosArr[i] || 0))
-    );
+    )
   }
 
   /**
@@ -122,15 +122,15 @@ export default class Control {
         const { pos: lastPos, inRange } = this.getValidPos(
           originPos + changePos,
           i
-        );
+        )
         if (!inRange) {
           changePos =
             Math.min(Math.abs(lastPos - originPos), Math.abs(changePos)) *
-            (changePos < 0 ? -1 : 1);
+            (changePos < 0 ? -1 : 1)
         }
       }
-    });
-    return this.dotsPos.map(_ => changePos);
+    })
+    return this.dotsPos.map(_ => changePos)
   }
 
   /**
@@ -147,12 +147,12 @@ export default class Control {
     changePos: number,
     index: number
   ): number[] {
-    const changeDots = [{ index, changePos }];
-    const newChangePos = changePos;
-    [this.minRange, this.maxRange].forEach(
+    const changeDots = [{ index, changePos }]
+    const newChangePos = changePos
+    ;[this.minRange, this.maxRange].forEach(
       (isLimitRange?: number, rangeIndex?: number) => {
         if (!isLimitRange) {
-          return false;
+          return false
         }
         const next =
           changePos > 0
@@ -160,37 +160,37 @@ export default class Control {
               ? 1
               : -1
             : rangeIndex === 0
-            ? -1
-            : 1;
+              ? -1
+              : 1
         const inLimitRange = (pos1: number, pos2: number) =>
           rangeIndex === 0
             ? Math.abs(pos1 - pos2) < this.minRangeDir
-            : Math.abs(pos1 - pos2) > this.maxRangeDir;
+            : Math.abs(pos1 - pos2) > this.maxRangeDir
 
-        let i = index + next;
-        let nextPos = this.dotsPos[i];
-        let prevPos = pos;
+        let i = index + next
+        let nextPos = this.dotsPos[i]
+        let prevPos = pos
         while (this.isPos(nextPos) && inLimitRange(nextPos, prevPos)) {
-          const { pos: lastPos } = this.getValidPos(nextPos + newChangePos, i);
+          const { pos: lastPos } = this.getValidPos(nextPos + newChangePos, i)
           changeDots.push({
             index: i,
-            changePos: lastPos - nextPos
-          });
-          i = i + next;
-          prevPos = lastPos;
-          nextPos = this.dotsPos[i];
+            changePos: lastPos - nextPos,
+          })
+          i = i + next
+          prevPos = lastPos
+          nextPos = this.dotsPos[i]
         }
       }
-    );
+    )
 
     return this.dotsPos.map((_, i) => {
-      const changeDot = changeDots.find(dot => dot.index === i);
-      return changeDot ? changeDot.changePos : 0;
-    });
+      const changeDot = changeDots.find(dot => dot.index === i)
+      return changeDot ? changeDot.changePos : 0
+    })
   }
 
   private isPos(pos: any): boolean {
-    return typeof pos === 'number';
+    return typeof pos === 'number'
   }
 
   /**
@@ -201,8 +201,8 @@ export default class Control {
    * @memberof Control
    */
   private getRecentDot(pos: number): number {
-    const arr = this.dotsPos.map(dotPos => Math.abs(dotPos - pos));
-    return arr.indexOf(Math.min(...arr));
+    const arr = this.dotsPos.map(dotPos => Math.abs(dotPos - pos))
+    return arr.indexOf(Math.min(...arr))
   }
 
   /**
@@ -217,20 +217,20 @@ export default class Control {
     newPos: number,
     index: number
   ): { pos: number; inRange: boolean } {
-    const range = this.valuePosRange[index];
-    let pos = newPos;
-    let inRange = true;
+    const range = this.valuePosRange[index]
+    let pos = newPos
+    let inRange = true
     if (newPos < range[0]) {
-      pos = range[0];
-      inRange = false;
+      pos = range[0]
+      inRange = false
     } else if (newPos > range[1]) {
-      pos = range[1];
-      inRange = false;
+      pos = range[1]
+      inRange = false
     }
     return {
       pos,
-      inRange
-    };
+      inRange,
+    }
   }
 
   /**
@@ -242,25 +242,25 @@ export default class Control {
    */
   private parseValue(val: TValue): number {
     if (this.data) {
-      val = this.data.indexOf(val);
+      val = this.data.indexOf(val)
     } else if (typeof val === 'number') {
       if (val < this.min) {
-        this.emitError(ERROR_TYPE.MIN);
-        return 0;
+        this.emitError(ERROR_TYPE.MIN)
+        return 0
       }
       if (val > this.max) {
-        this.emitError(ERROR_TYPE.MAX);
-        return 0;
+        this.emitError(ERROR_TYPE.MAX)
+        return 0
       }
-      val = new Decimal(val).minusChain(this.min).divide(this.interval);
+      val = new Decimal(val).minusChain(this.min).divide(this.interval)
     }
 
     if (typeof val !== 'number') {
-      this.emitError(ERROR_TYPE.VALUE);
-      return 0;
+      this.emitError(ERROR_TYPE.VALUE)
+      return 0
     }
 
-    return this.valuePos[val];
+    return this.valuePos[val]
   }
 
   /**
@@ -272,10 +272,10 @@ export default class Control {
    * @memberof Control
    */
   private parsePos(pos: number): TValue {
-    const index = Math.round(pos / this.gap);
+    const index = Math.round(pos / this.gap)
     return this.data
       ? this.data[index]
-      : new Decimal(index).multiplyChain(this.interval).plus(this.min);
+      : new Decimal(index).multiplyChain(this.interval).plus(this.min)
   }
 
   /**
@@ -287,69 +287,69 @@ export default class Control {
    */
   private emitError(type: ERROR_TYPE) {
     if (this.onError) {
-      this.onError(type, ERROR_MSG[type]);
+      this.onError(type, ERROR_MSG[type])
     }
   }
 
   // 所有可用值的个数
   private get total(): number {
-    let total = 0;
+    let total = 0
     if (this.data) {
-      total = this.data.length - 1;
+      total = this.data.length - 1
     } else {
-      total = new Decimal(this.max).minusChain(this.min).divide(this.interval);
+      total = new Decimal(this.max).minusChain(this.min).divide(this.interval)
     }
     if (total - Math.floor(total) !== 0) {
-      this.emitError(ERROR_TYPE.INTERVAL);
-      return 0;
+      this.emitError(ERROR_TYPE.INTERVAL)
+      return 0
     }
-    return total;
+    return total
   }
 
   // 每个可用值之间的距离
   private get gap(): number {
-    return 100 / this.total;
+    return 100 / this.total
   }
 
   // 每个可用值的位置
   private get valuePos(): number[] {
-    const gap = this.gap;
+    const gap = this.gap
     return Array.from(new Array(this.total), (_, index) => {
-      return index * gap;
-    }).concat([100]);
+      return index * gap
+    }).concat([100])
   }
 
   // 两个滑块最小的距离
   private get minRangeDir(): number {
-    return this.minRange ? this.minRange * this.gap : 0;
+    return this.minRange ? this.minRange * this.gap : 0
   }
 
   // 两个滑块最大的距离
   private get maxRangeDir(): number {
-    return this.maxRange ? this.maxRange * this.gap : 100;
+    return this.maxRange ? this.maxRange * this.gap : 100
   }
 
   // 每个滑块的滑动范围
   private get valuePosRange(): Array<[number, number]> {
-    const dotsPos = this.dotsPos;
-    const valuePosRange: Array<[number, number]> = [];
+    const dotsPos = this.dotsPos
+    const valuePosRange: Array<[number, number]> = []
 
     dotsPos.forEach((pos, i) => {
-      const prevPos = valuePosRange[i - 1] || [0, 100];
+      const prevPos = valuePosRange[i - 1] || [0, 100]
       valuePosRange.push([
         this.minRange
           ? this.minRangeDir * i
           : !this.enableCross
-          ? dotsPos[i - 1] || 0
-          : 0,
+            ? dotsPos[i - 1] || 0
+            : 0,
         this.minRange
           ? 100 - this.minRangeDir * (dotsPos.length - 1 - i)
           : !this.enableCross
-          ? dotsPos[i + 1] || 100
-          : 100
-      ]);
-    });
+            ? dotsPos[i + 1] || 100
+            : 100,
+      ])
+    })
 
-    return valuePosRange;
+    return valuePosRange
   }
 }

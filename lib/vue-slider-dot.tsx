@@ -5,14 +5,14 @@ import State, { StateMap } from './utils/state'
 import './styles/dot.scss'
 
 export const DotState: StateMap = {
-  None  : 0,
-  Drag  : 1 << 0,
-  FOCUS : 1 << 1,
-  KEY   : 1 << 2
+  None: 0,
+  Drag: 1 << 0,
+  FOCUS: 1 << 1,
+  KEY: 1 << 2,
 }
 
 export interface DotPos {
-  x: number,
+  x: number
   y: number
 }
 
@@ -34,8 +34,7 @@ export default class VueSliderDot extends Vue {
   dotSize!: number | [number, number]
 
   // dot 样式
-  @Prop()
-  dotStyle?: CSSStyleDeclaration
+  @Prop() dotStyle?: CSSStyleDeclaration
 
   // 是否禁用状态
   @Prop({ default: false })
@@ -46,8 +45,8 @@ export default class VueSliderDot extends Vue {
       'vue-slider-dot',
       {
         'vue-slider-dot-disabled': this.disabled,
-        'vue-slider-dot-focus': this.states.has(DotState.Drag)
-      }
+        'vue-slider-dot-focus': this.states.has(DotState.Drag),
+      },
     ]
   }
 
@@ -56,8 +55,8 @@ export default class VueSliderDot extends Vue {
       'vue-slider-handle',
       {
         'vue-slider-handle-disabled': this.disabled,
-        'vue-slider-handle-focus': this.states.has(DotState.Drag)
-      }
+        'vue-slider-handle-focus': this.states.has(DotState.Drag),
+      },
     ]
   }
 
@@ -115,16 +114,13 @@ export default class VueSliderDot extends Vue {
   render() {
     return (
       <div
-        ref='dot'
+        ref="dot"
         class={this.dotClasses}
         onMousedown={this.dragStart}
         onTouchstart={this.dragStart}
       >
         {this.$slots.default || (
-          <div
-            class={this.handleClasses}
-            style={this.dotStyle}
-          ></div>
+          <div class={this.handleClasses} style={this.dotStyle} />
         )}
       </div>
     )

@@ -24,9 +24,18 @@
     "serve": "vue-cli-service serve",
     "build": "vue-cli-service build",
     "package": "vue-cli-service build --target lib --name vue-slider-component lib/index.ts",
-    "prettier": "prettier --single-quote --write 'lib/**/*.ts'",
+    "prettier": "prettier --single-quote --no-semi --write lib/**/*.ts lib/**/*.tsx",
     "lint": "vue-cli-service lint",
     "test:unit": "vue-cli-service test:unit"
+  },
+  "gitHooks": {
+    "pre-commit": "npm run prettier"
+  },
+  "prettier": {
+    "semi": false,
+    "singleQuote": true,
+    "trailingComma": "es5",
+    "printWidth": 120
   },
   "dependencies": {
     "vue": "^2.5.17",
