@@ -22,21 +22,22 @@ import VueSlider from '../lib'
   },
 })
 export default class App extends Vue {
-  value = [0, 20]
+  value = [0, 80]
   // value = ['01', '03']
   show = true
 
   sliderOptions = {
-    width: 180,
-    height: 4,
+    width: 380,
+    // height: 6,
+    // dotSize: 16,
     min: 0,
-    max: 100,
+    max: 120,
     interval: 20,
     // disabled: true,
     // enableCross: false,
     // direction: 'rtl',
     // fixed: true,
-    minRange: 1,
+    // minRange: 1,
     // maxRange: 2,
     // interval: 2,
     // data: ['01', '02', '03', '04', '05', '06'],
@@ -51,26 +52,29 @@ export default class App extends Vue {
         label: '100℃',
         style: {
           color: 'red',
-        }
+        },
       },
     },
     tailStyle: {
       // backgroundColor: '#999'
     },
-    dotOption: [{
-      disabled: false,
-      style: {
-        // opacity: .7
-      }
-    }, {
-      disabled: true,
-      style: {
-        // opacity: .7
+    dotOption: [
+      {
+        disabled: false,
+        style: {
+          // opacity: .7
+        },
       },
-      focusStyle: {
-        borderColor: 'red'
-      }
-    }]
+      {
+        disabled: true,
+        style: {
+          // opacity: .7
+        },
+        focusStyle: {
+          borderColor: 'red',
+        },
+      },
+    ],
   }
 
   log(name: string, ...args: any[]) {
@@ -92,5 +96,4 @@ export default class App extends Vue {
   justify-content: center;
   align-items: center;
 }
-
 </style>

@@ -12,7 +12,7 @@
     "semicolon": [true, "never"],
     "member-access": [true, "no-public"],
     "arrow-parens": [true, "ban-single-arg-parens"],
-    "quotemark": [true, "single"],
+    "quotemark": [true, "single", "jsx-double"],
     "indent": [true, "spaces", 2],
     "trailing-comma": [true, "never"],
     "no-bitwise": false,
@@ -27,6 +27,20 @@
         "public-constructor",
         "private-public"
       ]
-    }]
+    }],
+    "whitespace": [
+      true,
+      "check-branch",
+      "check-decl",
+      "check-operator",
+      "check-type",
+      "check-typecast"
+    ],
+    "align": [
+      true,
+      "arguments",
+      "elements",
+      "members"
+    ]
   }
 }

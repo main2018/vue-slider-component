@@ -12,7 +12,7 @@ export const toPx = (value: number | string): string => {
 export const getPos = (
   e: MouseEvent | TouchEvent,
   elem: HTMLDivElement,
-  isReverse: boolean
+  isReverse: boolean,
 ): IPosObject => {
   const event = e instanceof TouchEvent ? e.targetTouches[0] : e
   const posObj = {

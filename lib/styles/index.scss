@@ -6,7 +6,7 @@
   user-select: none;
 
   &.vue-slider-disabled {
-    opacity: .5;
+    opacity: 0.5;
     cursor: not-allowed;
 
     .vue-slider-dot {
@@ -102,7 +102,7 @@
       display: block;
     }
     &.vue-slider-always .vue-slider-tooltip-wrap {
-      display: block!important;
+      display: block !important;
     }
   }
   &.vue-slider-horizontal .vue-slider-dot {
@@ -136,7 +136,7 @@
         bottom: -10px;
         left: 50%;
         transform: translate(-50%, 0);
-        @include triangle(5px, inherit, bottom)
+        @include triangle(5px, inherit, bottom);
       }
     }
     &.vue-slider-tooltip-bottom {
@@ -150,7 +150,7 @@
         top: -10px;
         left: 50%;
         transform: translate(-50%, 0);
-        @include triangle(5px, inherit, bottom)
+        @include triangle(5px, inherit, bottom);
       }
     }
     &.vue-slider-tooltip-left {
@@ -164,7 +164,7 @@
         top: 50%;
         right: -10px;
         transform: translate(0, -50%);
-        @include triangle(5px, inherit, bottom)
+        @include triangle(5px, inherit, bottom);
       }
     }
     &.vue-slider-tooltip-right {
@@ -178,7 +178,7 @@
         top: 50%;
         left: -10px;
         transform: translate(0, -50%);
-        @include triangle(5px, inherit, bottom)
+        @include triangle(5px, inherit, bottom);
       }
     }
     // merged style
@@ -216,7 +216,8 @@
     width: 8px;
     height: 8px;
 
-    &:first-child .vue-slider-piecewise-dot, &:last-child .vue-slider-piecewise-dot {
+    &:first-child .vue-slider-piecewise-dot,
+    &:last-child .vue-slider-piecewise-dot {
       visibility: hidden;
     }
   }
@@ -231,9 +232,10 @@
     border-radius: 50%;
     transform: translate(-50%, -50%);
     z-index: 2;
-    transition: all .3s;
+    transition: all 0.3s;
   }
-  &.vue-slider-horizontal .vue-slider-piecewise-label, &.vue-slider-horizontal-reverse .vue-slider-piecewise-label {
+  &.vue-slider-horizontal .vue-slider-piecewise-label,
+  &.vue-slider-horizontal-reverse .vue-slider-piecewise-label {
     position: absolute;
     display: inline-block;
     top: 100%;
@@ -244,7 +246,8 @@
     transform: translate(-50%, 8px);
     visibility: visible;
   }
-  &.vue-slider-vertical .vue-slider-piecewise-label, &.vue-slider-vertical-reverse .vue-slider-piecewise-label {
+  &.vue-slider-vertical .vue-slider-piecewise-label,
+  &.vue-slider-vertical-reverse .vue-slider-piecewise-label {
     position: absolute;
     display: inline-block;
     top: 50%;

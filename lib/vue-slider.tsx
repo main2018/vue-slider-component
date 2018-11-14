@@ -1,36 +1,18 @@
-import { Component, Model, Prop, Vue } from 'vue-property-decorator'
+import { Component, Model, Prop, Vue, Watch } from 'vue-property-decorator'
+import { TValue, Marks, DotOption, DotState, Dot, TDirection } from './typings'
 import VueSliderDot from './vue-slider-dot'
 
 import { toPx, getPos } from './utils'
 import Decimal from './utils/decimal'
-import Control, { TValue, ERROR_TYPE, Marks } from './utils/control'
+import Control, { ERROR_TYPE } from './utils/control'
 import State, { StateMap } from './utils/state'
 
 import './styles/slider.scss'
-import './styles/piecewise.scss'
-
-interface Styles {
-  [key: string]: any
-}
-
-export type TDirection = 'ltr' | 'rtl' | 'ttb' | 'btt'
+import './styles/mark.scss'
 
 export const SliderState: StateMap = {
   None: 0,
   Drag: 1 << 0,
-}
-
-export interface DotOption {
-  disabled?: boolean
-  style?: Styles
-  focusStyle?: Styles
-  disabledStyle?: Styles
-}
-
-export interface Dot extends DotOption {
-  pos: number
-  value: TValue
-  focus: boolean
 }
 
 const DEFAULT_SLIDER_SIZE = 6
@@ -48,6 +30,7 @@ const DEFAULT_SLIDER_SIZE = 6
 export default class VueSlider extends Vue {
   private control!: Control
   private states: State = new State(SliderState)
+  private scale: number = 1 // 比例，1% = ${scale}px
 
   focusDotIndex: number = 0
 
@@ -61,67 +44,67 @@ export default class VueSlider extends Vue {
   value!: TValue | TValue[]
 
   // display of the component
-  @Prop({ default: true })
+  @Prop({ type: Boolean, default: true })
   show!: boolean
 
   // component width
-  @Prop() width?: number
+  @Prop(Number) width?: number
 
   // component height
-  @Prop() height?: number
+  @Prop(Number) height?: number
 
   // the size of the slider, optional [width, height] | size
-  @Prop({ default: 8 })
+  @Prop({ default: 12 })
   dotSize!: [number, number] | number
 
   // the direction of the slider
-  @Prop({ default: 'ltr' })
+  @Prop({ default: 'ltr', validator: dir => ['ltr', 'rtl', 'ttb', 'btt'].indexOf(dir) > -1 })
   direction!: TDirection
 
   // 最小值
-  @Prop({ default: 0 })
+  @Prop({ type: Number, default: 0 })
   min!: number
 
   // 最小值
-  @Prop({ default: 100 })
+  @Prop({ type: Number, default: 100 })
   max!: number
 
   // 间隔
-  @Prop({ default: 1 })
+  @Prop({ type: Number, default: 1 })
   interval!: number
 
   // 运动速度
-  @Prop({ default: 0.5 })
+  @Prop({ type: Number, default: 0.5 })
   speed!: number
 
   // 是否禁用滑块
   @Prop() disabled?: boolean
 
   // 自定义数据
-  @Prop({ default: null })
+  @Prop(Array)
   data!: TValue[] | null
 
   // 是否懒同步值
-  @Prop({ default: false })
+  @Prop({ type: Boolean, default: false })
   lazy!: boolean
 
   // 初始化时候是否有过渡动画
-  @Prop({ default: false })
+  @Prop({ type: Boolean, default: false })
   startAnimation!: boolean
 
   // 是否允许滑块交叉
-  @Prop({ default: true })
+  @Prop({ type: Boolean, default: true })
   enableCross!: boolean
 
   // 是否固定滑块见间隔
-  @Prop({ default: false })
+  @Prop({ type: Boolean, default: false })
   fixed!: boolean
 
   // 滑块之间的最小距离
-  @Prop() minRange?: number
+  @Prop(Number) minRange?: number
 
   // 滑块之间的最大距离
-  @Prop() maxRange?: number
+  @Prop(Number) maxRange?: number
 
   // 滑块之间的最大距离
   @Prop() marks?: boolean | Marks
@@ -129,6 +112,7 @@ export default class VueSlider extends Vue {
   // tail style
   @Prop() tailStyle?: CSSStyleDeclaration
 
+  // 滑块的配置
   @Prop() dotOption?: DotOption | DotOption[]
 
   // 轨道尺寸
@@ -179,18 +163,14 @@ export default class VueSlider extends Vue {
     if (this.isHorizontal) {
       dotPos = {
         marginTop: `-${(dotHeight - this.tailSize) / 2}px`,
-        [this.direction === 'ltr'
-          ? 'marginLeft'
-          : 'marginRight']: `-${dotWidth / 2}px`,
+        [this.direction === 'ltr' ? 'marginLeft' : 'marginRight']: `-${dotWidth / 2}px`,
         top: '0',
         [this.direction === 'ltr' ? 'left' : 'right']: '0',
       }
     } else {
       dotPos = {
         marginLeft: `-${(dotWidth - this.tailSize) / 2}px`,
-        [this.direction === 'btt'
-          ? 'marginBottom'
-          : 'marginTop']: `-${dotHeight / 2}px`,
+        [this.direction === 'btt' ? 'marginBottom' : 'marginTop']: `-${dotHeight / 2}px`,
         left: '0',
         [this.direction === 'btt' ? 'bottom' : 'top']: '0',
       }
@@ -226,19 +206,50 @@ export default class VueSlider extends Vue {
     return this.direction === 'rtl' || this.direction === 'ttb'
   }
 
+  // 得到所有的滑块
+  get dots(): Dot[] {
+    return this.control.dotsPos.map((pos, index) => ({
+      pos,
+      value: this.control.dotsValue[index],
+      focus: this.states.has(SliderState.Drag) && this.focusDotIndex === index,
+      ...((Array.isArray(this.dotOption) ? this.dotOption[index] : this.dotOption) || {}),
+    }))
+  }
+
+  get animateTime(): number {
+    if (this.states.has(SliderState.Drag)) {
+      return 0
+    }
+    return this.speed
+  }
+
+  get dotStates(): DotState[] {
+    if (!this.dotOption) {
+      return this.control.dotsValue.map(() => ({
+        disabled: false,
+        lock: false
+      }))
+    } else {
+      return Array.isArray(this.dotOption) ? this.dotOption.map(dot => ({
+        disabled: dot.lock || !!dot.disabled,
+        lock: !!dot.lock
+      })) : this.control.dotsValue.map(() => {
+        const { disabled, lock } = (this.dotOption as DotOption)
+        return {
+          disabled: lock || !!disabled,
+          lock: !!lock
+        }
+      })
+    }
+  }
+
   created() {
     this.initControl()
   }
 
-  mounted() {
-    // this.syncDots(this.startAnimation ? this.speed : 0)
-  }
-
   getScale() {
-    this.control.scale = new Decimal(
-      Math.floor(
-        this.isHorizontal ? this.$el.offsetWidth : this.$el.offsetHeight
-      )
+    this.scale = new Decimal(
+      Math.floor(this.isHorizontal ? this.$el.offsetWidth : this.$el.offsetHeight),
     ).divide(100)
   }
 
@@ -251,10 +262,11 @@ export default class VueSlider extends Vue {
       this.max,
       this.min,
       this.interval,
+      this.dotStates,
       this.minRange,
       this.maxRange,
       this.marks,
-      this.emitError
+      this.emitError,
     )
   }
 
@@ -310,36 +322,17 @@ export default class VueSlider extends Vue {
     if (this.states.has(SliderState.Drag)) {
       return
     }
+    this.getScale()
     const pos = this.getPosByEvent(e)
     this.control.setDotPos(pos)
+    this.syncValueByPos()
   }
 
   private getPosByEvent(e: MouseEvent | TouchEvent): number {
     return (
-      getPos(e, this.$el as HTMLDivElement, this.isReverse)[
-        this.isHorizontal ? 'x' : 'y'
-      ] / this.control.scale
+      getPos(e, this.$el as HTMLDivElement, this.isReverse)[this.isHorizontal ? 'x' : 'y'] /
+      this.scale
     )
-  }
-
-  // 得到所有的滑块
-  get dots(): Dot[] {
-    return this.control.dotsPos.map((pos, index) => ({
-      pos,
-      value: this.control.dotsValue[index],
-      focus: this.states.has(SliderState.Drag) && this.focusDotIndex === index,
-      ...((Array.isArray(this.dotOption)
-        ? this.dotOption[index]
-        : this.dotOption) || {}),
-    }))
-  }
-
-  get animateTime(): number {
-    if (this.states.has(SliderState.Drag)) {
-      return 0
-    }
-
-    return this.speed
   }
 
   render() {
@@ -372,9 +365,7 @@ export default class VueSlider extends Vue {
                 },
               ]}
               onDragStart={() => this.dragStart(index)}
-              onDragging={(e: MouseEvent | TouchEvent) =>
-                this.dragMove(e, index)
-              }
+              onDragging={(e: MouseEvent | TouchEvent) => this.dragMove(e, index)}
               onDragEnd={this.dragEnd}
             >
               {this.$scopedSlots.dot

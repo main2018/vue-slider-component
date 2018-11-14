@@ -1,10 +1,5 @@
 import Decimal from './decimal'
-
-export type TValue = number | string | symbol
-
-export interface Marks {
-  [key: string]: string | { label?: string; style?: CSSStyleDeclaration }
-}
+import { TValue, Marks, DotState } from '../typings'
 
 export const enum ERROR_TYPE {
   VALUE = 1, // 值的类型不正确
@@ -15,16 +10,15 @@ export const enum ERROR_TYPE {
 
 const ERROR_MSG = {
   [ERROR_TYPE.VALUE]: 'The type of the "value" is illegal',
-  [ERROR_TYPE.INTERVAL]: 'The prop "interval" is invalid, "(max - min)" cannot be divisible by "interval"',
+  [ERROR_TYPE.INTERVAL]:
+    'The prop "interval" is invalid, "(max - min)" cannot be divisible by "interval"',
   [ERROR_TYPE.MIN]: 'The "value" cannot be less than the minimum.',
   [ERROR_TYPE.MAX]: 'The "value" cannot be greater than the maximum.',
 }
 
 export default class Control {
-  scale: number = 1 // 比例，1% = ${scale}px
   dotsPos: number[] = [] // 每个滑块的位置
   dotsValue: TValue[] = [] // 每个滑块的值
-  inDrag: boolean = false // 是否拖拽状态 (拖拽状态下，滑块顺序不排序)
 
   constructor(
     value: TValue | TValue[],
@@ -34,17 +28,13 @@ export default class Control {
     private max: number,
     private min: number,
     private interval: number,
+    private dotState: DotState[],
     private minRange?: number,
     private maxRange?: number,
     private marks?: boolean | Marks,
-    private onError?: (type: ERROR_TYPE, message: string) => void
+    private onError?: (type: ERROR_TYPE, message: string) => void,
   ) {
     this.setValue(value)
-  }
-
-  // 设置是否拖拽状态中
-  setDragState(inDrag: boolean) {
-    this.inDrag = inDrag
   }
 
   // 设置滑块的值
@@ -85,13 +75,16 @@ export default class Control {
     if (index === void 0) {
       index = this.getRecentDot(pos)
     }
+    if (this.dotState[index].disabled) {
+      return
+    }
     // 滑块变化的距离
     pos = this.getValidPos(pos, index).pos
     const changePos = pos - this.dotsPos[index]
 
     // 没有变化则不更新位置
     if (!changePos) {
-      return false
+      return
     }
 
     let changePosArr: number[] = new Array(this.dotsPos.length)
@@ -103,9 +96,7 @@ export default class Control {
       changePosArr[index] = changePos
     }
 
-    this.setDotsPos(
-      this.dotsPos.map((curPos, i) => curPos + (changePosArr[i] || 0))
-    )
+    this.setDotsPos(this.dotsPos.map((curPos, i) => curPos + (changePosArr[i] || 0)))
   }
 
   /**
@@ -119,14 +110,10 @@ export default class Control {
   private getFixedChangePosArr(changePos: number, index: number): number[] {
     this.dotsPos.forEach((originPos, i) => {
       if (i !== index) {
-        const { pos: lastPos, inRange } = this.getValidPos(
-          originPos + changePos,
-          i
-        )
+        const { pos: lastPos, inRange } = this.getValidPos(originPos + changePos, i)
         if (!inRange) {
           changePos =
-            Math.min(Math.abs(lastPos - originPos), Math.abs(changePos)) *
-            (changePos < 0 ? -1 : 1)
+            Math.min(Math.abs(lastPos - originPos), Math.abs(changePos)) * (changePos < 0 ? -1 : 1)
         }
       }
     })
@@ -142,46 +129,33 @@ export default class Control {
    * @returns {number[]}
    * @memberof Control
    */
-  private getLimitRangeChangePosArr(
-    pos: number,
-    changePos: number,
-    index: number
-  ): number[] {
+  private getLimitRangeChangePosArr(pos: number, changePos: number, index: number): number[] {
     const changeDots = [{ index, changePos }]
     const newChangePos = changePos
-    ;[this.minRange, this.maxRange].forEach(
-      (isLimitRange?: number, rangeIndex?: number) => {
-        if (!isLimitRange) {
-          return false
-        }
-        const next =
-          changePos > 0
-            ? rangeIndex === 0
-              ? 1
-              : -1
-            : rangeIndex === 0
-              ? -1
-              : 1
-        const inLimitRange = (pos1: number, pos2: number) =>
-          rangeIndex === 0
-            ? Math.abs(pos1 - pos2) < this.minRangeDir
-            : Math.abs(pos1 - pos2) > this.maxRangeDir
-
-        let i = index + next
-        let nextPos = this.dotsPos[i]
-        let prevPos = pos
-        while (this.isPos(nextPos) && inLimitRange(nextPos, prevPos)) {
-          const { pos: lastPos } = this.getValidPos(nextPos + newChangePos, i)
-          changeDots.push({
-            index: i,
-            changePos: lastPos - nextPos,
-          })
-          i = i + next
-          prevPos = lastPos
-          nextPos = this.dotsPos[i]
-        }
+    ;[this.minRange, this.maxRange].forEach((isLimitRange?: number, rangeIndex?: number) => {
+      if (!isLimitRange) {
+        return false
       }
-    )
+      const next = changePos > 0 ? (rangeIndex === 0 ? 1 : -1) : rangeIndex === 0 ? -1 : 1
+      const inLimitRange = (pos1: number, pos2: number) =>
+        rangeIndex === 0
+          ? Math.abs(pos1 - pos2) < this.minRangeDir
+          : Math.abs(pos1 - pos2) > this.maxRangeDir
+
+      let i = index + next
+      let nextPos = this.dotsPos[i]
+      let prevPos = pos
+      while (this.isPos(nextPos) && inLimitRange(nextPos, prevPos)) {
+        const { pos: lastPos } = this.getValidPos(nextPos + newChangePos, i)
+        changeDots.push({
+          index: i,
+          changePos: lastPos - nextPos,
+        })
+        i = i + next
+        prevPos = lastPos
+        nextPos = this.dotsPos[i]
+      }
+    })
 
     return this.dotsPos.map((_, i) => {
       const changeDot = changeDots.find(dot => dot.index === i)
@@ -213,10 +187,7 @@ export default class Control {
    * @param {number} index 滑块索引
    * @returns {{ pos: number, inRange: boolean }}
    */
-  private getValidPos(
-    newPos: number,
-    index: number
-  ): { pos: number; inRange: boolean } {
+  private getValidPos(newPos: number, index: number): { pos: number; inRange: boolean } {
     const range = this.valuePosRange[index]
     let pos = newPos
     let inRange = true
@@ -337,11 +308,7 @@ export default class Control {
     dotsPos.forEach((pos, i) => {
       const prevPos = valuePosRange[i - 1] || [0, 100]
       valuePosRange.push([
-        this.minRange
-          ? this.minRangeDir * i
-          : !this.enableCross
-            ? dotsPos[i - 1] || 0
-            : 0,
+        this.minRange ? this.minRangeDir * i : !this.enableCross ? dotsPos[i - 1] || 0 : 0,
         this.minRange
           ? 100 - this.minRangeDir * (dotsPos.length - 1 - i)
           : !this.enableCross

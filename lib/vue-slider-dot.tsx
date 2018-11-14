@@ -1,5 +1,5 @@
 import { Component, Model, Prop, Watch, Vue } from 'vue-property-decorator'
-import { TValue } from './utils/control'
+import { TValue } from './typings'
 import State, { StateMap } from './utils/state'
 
 import './styles/dot.scss'
@@ -9,11 +9,6 @@ export const DotState: StateMap = {
   Drag: 1 << 0,
   FOCUS: 1 << 1,
   KEY: 1 << 2,
-}
-
-export interface DotPos {
-  x: number
-  y: number
 }
 
 @Component
@@ -119,9 +114,7 @@ export default class VueSliderDot extends Vue {
         onMousedown={this.dragStart}
         onTouchstart={this.dragStart}
       >
-        {this.$slots.default || (
-          <div class={this.handleClasses} style={this.dotStyle} />
-        )}
+        {this.$slots.default || <div class={this.handleClasses} style={this.dotStyle} />}
       </div>
     )
   }

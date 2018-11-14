@@ -1,4 +1,3 @@
-
 .vue-slider-component {
   position: relative;
   box-sizing: content-box;
@@ -6,7 +5,7 @@
   display: block;
 
   &.vue-slider-disabled {
-    opacity: .5;
+    opacity: 0.5;
     pointer-events: none;
   }
 
