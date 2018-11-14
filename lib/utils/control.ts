@@ -18,8 +18,9 @@ const ERROR_MSG = {
 
 export default class Control {
   scale: number = 1 // 比例，1% = ${scale}px
-  dotsPos: number[] = [] // 每个点的位置
-  dotsValue: TValue[] = [] // 每个点的值
+  dotsPos: number[] = [] // 每个滑块的位置
+  dotsValue: TValue[] = [] // 每个滑块的值
+  inDrag: boolean = false // 是否拖拽状态 (拖拽状态下，滑块顺序不排序)
 
   constructor(
     value: TValue | TValue[],
@@ -34,6 +35,10 @@ export default class Control {
     private onError?: (type: ERROR_TYPE, message: string) => void
   ) {
     this.setValue(value)
+  }
+
+  setDragState(inDrag: boolean) {
+    this.inDrag = inDrag
   }
 
   // 设置滑块的值
@@ -80,7 +85,7 @@ export default class Control {
    */
   setDotPos(pos: number, index: number) {
     // 滑块变化的距离
-    let changePos = ((this.getValidPos(pos, index).pos) - this.dotsPos[index])
+    const changePos = ((this.getValidPos(pos, index).pos) - this.dotsPos[index])
 
     // 没有变化则不更新位置
     if (!changePos) {
@@ -88,30 +93,93 @@ export default class Control {
     }
 
     let changePosArr: number[] = new Array(this.dotsPos.length)
-
-    // 固定模式下，同步更新其他滑块的位置，若有滑块超过范围，则不更新位置
     if (this.fixed) {
-      this.dotsPos.forEach((originPos, i) => {
-        if (i !== index) {
-          const { pos: lastPos, inRange } = this.getValidPos(originPos + changePos, i)
-          if (!inRange) {
-            changePos = Math.min(Math.abs(lastPos - originPos), Math.abs(changePos)) * (changePos < 0 ? -1 : 1)
-          }
-        }
-      })
-      changePosArr = this.dotsPos.map(_ => changePos)
+      changePosArr = this.getFixedChangePosArr(changePos, index)
+    } else if (this.minRange || this.maxRange) {
+      changePosArr = this.getLimitRangeChangePosArr(pos, changePos, index)
     } else {
       changePosArr[index] = changePos
     }
 
-    // 最小范围模式中
-    // if (!this.fixed && this.minRange) {
-    //   if (changePos > 0) {
-
-    //   }
-    // }
-
     this.setDotsPos(this.dotsPos.map((curPos, i) => curPos + (changePosArr[i] || 0)))
+  }
+
+  /**
+   * 在 fixed 模式下，得到全部滑块变化的位置
+   *
+   * @param {number} changePos 单个滑块的变化距离
+   * @param {number} index 滑块的索引
+   * @returns {number[]}
+   * @memberof Control
+   */
+  getFixedChangePosArr(changePos: number, index: number): number[] {
+    this.dotsPos.forEach((originPos, i) => {
+      if (i !== index) {
+        const { pos: lastPos, inRange } = this.getValidPos(originPos + changePos, i)
+        if (!inRange) {
+          changePos = Math.min(Math.abs(lastPos - originPos), Math.abs(changePos)) * (changePos < 0 ? -1 : 1)
+        }
+      }
+    })
+    return this.dotsPos.map(_ => changePos)
+  }
+
+  /**
+   * 在 minRange/maxRange 模式下，得到全部滑块变化的位置
+   *
+   * @param {number} pos 单个滑块的位置
+   * @param {number} changePos 单个滑块的变化距离
+   * @param {number} index 滑块的索引
+   * @returns {number[]}
+   * @memberof Control
+   */
+  getLimitRangeChangePosArr(pos: number, changePos: number, index: number): number[] {
+    const changeDots = [{
+      index,
+      changePos
+    }]
+    const newChangePos = changePos
+    if (this.minRange) {
+      const next = (changePos > 0 ? 1 : -1)
+      let i = index + next
+      let nearPos = this.dotsPos[i]
+      let prevPos = pos
+      while (this.isPos(nearPos) && Math.abs(nearPos - prevPos) < this.minRangeDir) {
+        const { pos: lastPos, inRange } = this.getValidPos(nearPos + newChangePos, i)
+        changeDots.push({
+          index: i,
+          changePos: lastPos - nearPos
+        })
+        i = i + next
+        prevPos = lastPos
+        nearPos = this.dotsPos[i]
+      }
+    }
+    if (this.maxRange) {
+      const next = (changePos > 0 ? -1 : 1)
+      let i = index + next
+      let farPos = this.dotsPos[i]
+      let prevPos = pos
+      while (this.isPos(farPos) && Math.abs(farPos - prevPos) > this.maxRangeDir) {
+        const lastPos = prevPos + (this.maxRangeDir * (changePos < 0 ? 1 : -1))
+        changeDots.push({
+          index: i,
+          changePos: lastPos - farPos
+        })
+        i = i + next
+        prevPos = lastPos
+        farPos = this.dotsPos[i]
+      }
+    }
+
+    return this.dotsPos.map((_, i) => {
+      const changeDot = changeDots.find(dot => dot.index === i)
+      return changeDot ? changeDot.changePos : 0
+    })
+  }
+
+  private isPos(pos: any): boolean {
+    return typeof pos === 'number'
   }
 
   /**
