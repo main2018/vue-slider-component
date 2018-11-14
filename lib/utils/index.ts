@@ -1,4 +1,7 @@
-import { IPosObject } from '../vue-slider'
+interface IPosObject {
+  x: number
+  y: number
+}
 
 // 将数字或字符串格式化成像素格式
 export const toPx = (value: number | string): string => {

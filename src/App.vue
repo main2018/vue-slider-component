@@ -22,7 +22,7 @@ import VueSlider from '../lib'
   },
 })
 export default class App extends Vue {
-  value = [1, 30, 80]
+  value = [0, 20]
   // value = ['01', '03']
   show = true
 
@@ -30,28 +30,47 @@ export default class App extends Vue {
     width: 180,
     height: 4,
     min: 0,
-    max: 99,
-    interval: 1,
+    max: 100,
+    interval: 20,
+    // disabled: true,
+    // enableCross: false,
     // direction: 'rtl',
     // fixed: true,
-    minRange: 20,
-    maxRange: 40,
+    minRange: 1,
+    // maxRange: 2,
     // interval: 2,
     // data: ['01', '02', '03', '04', '05', '06'],
-    // marks: {
-    //   '-10': '10℃',
-    //   0: '0',
-    //   26: '26℃',
-    //   37: '37℃',
-    //   50: '50℃',
-    //   100: {
-    //     label: '100℃',
-    //     value: '热死了',
-    //     style: {
-    //       color: 'red',
-    //     }
-    //   },
-    // },
+    // process: (dots: number[], marks: number[]) => [[marks[0], dots[0]],
+    marks: {
+      '-10': '10℃',
+      '0': '0',
+      '26': '26℃',
+      '37': '37℃',
+      '50': '50℃',
+      '100': {
+        label: '100℃',
+        style: {
+          color: 'red',
+        }
+      },
+    },
+    tailStyle: {
+      // backgroundColor: '#999'
+    },
+    dotOption: [{
+      disabled: false,
+      style: {
+        // opacity: .7
+      }
+    }, {
+      disabled: true,
+      style: {
+        // opacity: .7
+      },
+      focusStyle: {
+        borderColor: 'red'
+      }
+    }]
   }
 
   log(name: string, ...args: any[]) {

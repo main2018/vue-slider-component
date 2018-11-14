@@ -1,12 +1,22 @@
-import { Component, Model, Prop, Vue } from 'vue-property-decorator'
+import {
+  Component,
+  Model,
+  Prop,
+  Vue,
+} from 'vue-property-decorator'
 import VueSliderDot from './vue-slider-dot'
 
 import { toPx, getPos } from './utils'
 import Decimal from './utils/decimal'
-import Control, { TValue, ERROR_TYPE } from './utils/control'
+import Control, { TValue, ERROR_TYPE, Marks } from './utils/control'
 import State, { StateMap } from './utils/state'
 
 import './styles/slider.scss'
+import './styles/piecewise.scss'
+
+interface Styles {
+  [key: string]: any
+}
 
 export type TDirection = 'ltr' | 'rtl' | 'ttb' | 'btt'
 
@@ -15,28 +25,36 @@ export const SliderState: StateMap = {
   Drag: 1 << 0,
 }
 
-export interface IDot {
-  pos: number,
-  value: TValue,
+export interface DotOption {
+  disabled?: boolean
+  style?: Styles
+  focusStyle?: Styles
+  disabledStyle?: Styles
 }
 
-export interface IPosObject {
-  x: number,
-  y: number
+export interface Dot extends DotOption {
+  pos: number,
+  value: TValue,
+  focus: boolean
 }
 
 const DEFAULT_SLIDER_SIZE = 6
 
 @Component({
+  data() {
+    return {
+      control: null
+    }
+  },
   components: {
     VueSliderDot,
   },
 })
 export default class VueSlider extends Vue {
   private control!: Control
-  private animateTime: number = 0
   private states: State = new State(SliderState)
-  dots: IDot[] = []
+
+  focusDotIndex: number = 0
 
   $refs!: {
     container: HTMLDivElement,
@@ -83,6 +101,10 @@ export default class VueSlider extends Vue {
   @Prop({ default: 0.5 })
   speed!: number
 
+  // 是否禁用滑块
+  @Prop()
+  disabled?: boolean
+
   // 自定义数据
   @Prop({ default: null })
   data!: TValue[] | null
@@ -111,12 +133,19 @@ export default class VueSlider extends Vue {
   @Prop()
   maxRange?: number
 
-  // dot tyle
+  // 滑块之间的最大距离
   @Prop()
-  dotStyle?: CSSStyleDeclaration
+  marks?: boolean | Marks
+
+  // tail style
+  @Prop()
+  tailStyle?: CSSStyleDeclaration
+
+  @Prop()
+  dotOption?: DotOption | DotOption[]
 
   // 轨道尺寸
-  get trackSize() {
+  get tailSize() {
     return (this.isHorizontal ? this.height : this.width) || DEFAULT_SLIDER_SIZE
   }
 
@@ -125,6 +154,9 @@ export default class VueSlider extends Vue {
     return [
       'vue-slider-component',
       `vue-slider-${this.direction}`,
+      {
+        'vue-slider-disabled': this.disabled
+      },
       //  disabledClass, stateClass, { 'vue-slider-has-label': piecewiseLabel }
     ]
   }
@@ -135,7 +167,7 @@ export default class VueSlider extends Vue {
     const containerWidth = this.width ? toPx(this.width) : (this.isHorizontal ? 'auto' : toPx(DEFAULT_SLIDER_SIZE))
     const containerHeight = this.height ? toPx(this.height) : (this.isHorizontal ? toPx(DEFAULT_SLIDER_SIZE) : 'auto')
     return {
-      margin: `${dotHeight / 2}px ${dotWidth / 2}px`,
+      padding: `${dotHeight / 2}px ${dotWidth / 2}px`,
       width: containerWidth,
       height: containerHeight,
     }
@@ -147,14 +179,14 @@ export default class VueSlider extends Vue {
     let dotPos: { [key: string]: string }
     if (this.isHorizontal) {
       dotPos = {
-        marginTop: `-${(dotHeight - this.trackSize) / 2}px`,
+        marginTop: `-${(dotHeight - this.tailSize) / 2}px`,
         [this.direction === 'ltr' ? 'marginLeft' : 'marginRight']: `-${dotWidth / 2}px`,
         top: '0',
         [this.direction === 'ltr' ? 'left' : 'right']: '0',
       }
     } else {
       dotPos = {
-        marginLeft: `-${(dotWidth - this.trackSize) / 2}px`,
+        marginLeft: `-${(dotWidth - this.tailSize) / 2}px`,
         [this.direction === 'btt' ? 'marginBottom' : 'marginTop']: `-${dotHeight / 2}px`,
         left: '0',
         [this.direction === 'btt' ? 'bottom' : 'top']: '0',
@@ -187,7 +219,6 @@ export default class VueSlider extends Vue {
   }
 
   // 是否反向
-  // @maybe deprecation
   get isReverse(): boolean {
     return this.direction === 'rtl' || this.direction === 'ttb'
   }
@@ -197,7 +228,7 @@ export default class VueSlider extends Vue {
   }
 
   mounted() {
-    this.syncPosByValue(this.startAnimation ? this.speed : 0)
+    // this.syncDots(this.startAnimation ? this.speed : 0)
   }
 
   getScale() {
@@ -217,19 +248,14 @@ export default class VueSlider extends Vue {
       this.interval,
       this.minRange,
       this.maxRange,
+      this.marks,
       this.emitError
     )
   }
 
-  // 同步滑块位置
-  private syncPosByValue(speed: number = 0) {
-    this.dots = this.control.getDots()
-    this.animateTime = speed
-  }
-
   // 同步值
   private syncValueByPos() {
-    const values = this.dots.map(dot => dot.value)
+    const values = this.control.dotsValue
     this.$emit('change', values.length === 1 ? values[0] : values)
   }
 
@@ -242,7 +268,8 @@ export default class VueSlider extends Vue {
   }
 
   // 拖拽开始
-  private dragStart() {
+  private dragStart(index: number) {
+    this.focusDotIndex = index
     this.getScale()
     this.states.add(SliderState.Drag)
     this.$emit('dragStart')
@@ -251,7 +278,6 @@ export default class VueSlider extends Vue {
   // 拖拽中
   private dragMove(e: MouseEvent | TouchEvent, index: number) {
     this.control.setDotPos(this.getPosByEvent(e), index)
-    this.syncPosByValue()
     if (!this.lazy) {
       this.syncValueByPos()
     }
@@ -260,36 +286,49 @@ export default class VueSlider extends Vue {
 
   // 拖拽结束
   private dragEnd() {
+    // NOTE: 滑块交叉后恢复滑块顺序位置
+    this.control.sortDotsPos()
     if (this.lazy) {
       this.syncValueByPos()
     }
-    this.states.delete(SliderState.Drag)
-    this.$emit('dragEnd')
 
-    // NOTE: 滑块交叉后恢复滑块顺序位置
-    this.control.sortDotsPos()
-    this.syncPosByValue()
-
-    this.$nextTick(() => {
+    setTimeout(() => {
       // NOTE: 拖拽完毕后同步滑块的位置
       this.control.syncDotsPos()
-      this.syncPosByValue(this.speed)
+
+      this.states.delete(SliderState.Drag)
+      this.$emit('dragEnd')
     })
   }
 
   private clickHandle(e: MouseEvent | TouchEvent) {
-    // if (this.states.has(SliderState.Drag)) {
-    //   console.log(this.states.has(SliderState.Drag))
-    //   this.states.delete(SliderState.Drag)
-    // }
-    // const pos = this.getPosByEvent(e)
-    // const index = this.control.getRecentDot(pos)
-    // this.control.setDotPos(pos, index)
-    // this.syncPosByValue(this.speed)
+    if (this.states.has(SliderState.Drag)) {
+      return
+    }
+    const pos = this.getPosByEvent(e)
+    this.control.setDotPos(pos)
   }
 
   private getPosByEvent(e: MouseEvent | TouchEvent): number {
     return getPos(e, (this.$el as HTMLDivElement), this.isReverse)[this.isHorizontal ? 'x' : 'y'] / this.control.scale
+  }
+
+  // 得到所有的滑块
+  get dots(): Dot[] {
+    return this.control.dotsPos.map((pos, index) => ({
+      pos,
+      value: this.control.dotsValue[index],
+      focus: this.states.has(SliderState.Drag) && this.focusDotIndex === index,
+      ...((Array.isArray(this.dotOption) ? this.dotOption[index] : this.dotOption) || {})
+    }))
+  }
+
+  get animateTime(): number {
+    if (this.states.has(SliderState.Drag)) {
+      return 0
+    }
+
+    return this.speed
   }
 
   render() {
@@ -301,32 +340,35 @@ export default class VueSlider extends Vue {
         onClick={this.clickHandle}
         aria-hidden={true}
       >
-        {
-          this.dots.map((dot, index) => (
-            <vue-slider-dot
-              ref='dot'
-              key={index}
-              dotSize={this.dotSize}
-              value={dot.pos}
-              tooltip={true}
-              disabled={false}
-              isReverse={this.isReverse}
-              dot-style={this.dotStyle}
-              style={[this.dotBaseStyle, {
-                [this.mainDirection]: `${dot.pos}%`,
-                transition: `${this.mainDirection} ${this.animateTime}s`
-              }]}
-              onDragStart={this.dragStart}
-              onDragging={(e: MouseEvent | TouchEvent) => this.dragMove(e, index)}
-              onDragEnd={this.dragEnd}
-            >
-              {this.$scopedSlots.dot ? this.$scopedSlots.dot({
-                value: dot.value,
-                disabled: true
-              }) : null}
-            </vue-slider-dot>
-          ))
-        }
+        <div class='vue-slider-rail' style={this.tailStyle}>
+          {
+            this.dots.map((dot, index) => (
+              <vue-slider-dot
+                ref='dot'
+                key={index}
+                dotSize={this.dotSize}
+                value={dot.pos}
+                disabled={dot.disabled}
+                dot-style={[
+                  dot.style,
+                  dot.disabled ? dot.disabledStyle : null,
+                  dot.focus ? dot.focusStyle : null
+                ]}
+                style={[this.dotBaseStyle, {
+                  [this.mainDirection]: `${dot.pos}%`,
+                  transition: `${this.mainDirection} ${this.animateTime}s`
+                }]}
+                onDragStart={() => this.dragStart(index)}
+                onDragging={(e: MouseEvent | TouchEvent) => this.dragMove(e, index)}
+                onDragEnd={this.dragEnd}
+              >
+                {this.$scopedSlots.dot ? this.$scopedSlots.dot({
+                  ...dot
+                }) : null}
+              </vue-slider-dot>
+            ))
+          }
+        </div>
       </div>
     )
   }

@@ -33,10 +33,6 @@ export default class VueSliderDot extends Vue {
   @Prop({ default: 16 })
   dotSize!: number | [number, number]
 
-  // the direction of the slider
-  @Prop({ default: false })
-  isReverse!: boolean
-
   // dot 样式
   @Prop()
   dotStyle?: CSSStyleDeclaration
@@ -49,7 +45,18 @@ export default class VueSliderDot extends Vue {
     return [
       'vue-slider-dot',
       {
-        'vue-slider-dot-drag': this.states.has(DotState.Drag)
+        'vue-slider-dot-disabled': this.disabled,
+        'vue-slider-dot-focus': this.states.has(DotState.Drag)
+      }
+    ]
+  }
+
+  get handleClasses() {
+    return [
+      'vue-slider-handle',
+      {
+        'vue-slider-handle-disabled': this.disabled,
+        'vue-slider-handle-focus': this.states.has(DotState.Drag)
       }
     ]
   }
@@ -115,7 +122,7 @@ export default class VueSliderDot extends Vue {
       >
         {this.$slots.default || (
           <div
-            class='vue-slider-dot-handle'
+            class={this.handleClasses}
             style={this.dotStyle}
           ></div>
         )}
