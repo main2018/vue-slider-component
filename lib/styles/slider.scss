@@ -1,3 +1,5 @@
+@import 'theme.scss';
+
 .vue-slider-component {
   position: relative;
   box-sizing: content-box;
@@ -14,6 +16,13 @@
     width: 100%;
     height: 100%;
     background-color: #ccc;
+    border-radius: 15px;
+  }
+
+  .vue-slider-process {
+    position: absolute;
+    z-index: 1;
+    background-color: $themeColor;
     border-radius: 15px;
   }
 }

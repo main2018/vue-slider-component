@@ -1,5 +1,19 @@
-import { Component, Model, Prop, Vue, Watch } from 'vue-property-decorator'
-import { TValue, Marks, DotOption, DotState, Dot, TDirection } from './typings'
+import {
+  Component,
+  Model,
+  Prop,
+  Vue,
+  Watch
+} from 'vue-property-decorator'
+import {
+  TValue,
+  Marks,
+  Styles,
+  DotOption,
+  DotStyle,
+  Dot,
+  TDirection
+} from './typings'
 import VueSliderDot from './vue-slider-dot'
 
 import { toPx, getPos } from './utils'
@@ -26,6 +40,7 @@ const DEFAULT_SLIDER_SIZE = 6
   components: {
     VueSliderDot,
   },
+  inheritAttrs: false,
 })
 export default class VueSlider extends Vue {
   private control!: Control
@@ -54,7 +69,7 @@ export default class VueSlider extends Vue {
   @Prop(Number) height?: number
 
   // the size of the slider, optional [width, height] | size
-  @Prop({ default: 12 })
+  @Prop({ default: 16 })
   dotSize!: [number, number] | number
 
   // the direction of the slider
@@ -100,6 +115,10 @@ export default class VueSlider extends Vue {
   @Prop({ type: Boolean, default: false })
   fixed!: boolean
 
+  // 是否排序
+  @Prop({ type: Boolean, default: true })
+  order!: boolean
+
   // 滑块之间的最小距离
   @Prop(Number) minRange?: number
 
@@ -110,10 +129,19 @@ export default class VueSlider extends Vue {
   @Prop() marks?: boolean | Marks
 
   // tail style
-  @Prop() tailStyle?: CSSStyleDeclaration
+  @Prop() tailStyle?: Styles
+
+  // process style
+  @Prop() processStyle?: Styles
+
+  // 滑块样式
+  @Prop() dotStyle?: DotStyle
 
   // 滑块的配置
-  @Prop() dotOption?: DotOption | DotOption[]
+  @Prop() dotOptions?: DotOption | DotOption[]
+
+  // 自定义process
+  @Prop(Function) process?: (dots: Dot[]) => Array<[number, number]>
 
   // 轨道尺寸
   get tailSize() {
@@ -152,6 +180,38 @@ export default class VueSlider extends Vue {
       width: containerWidth,
       height: containerHeight,
     }
+  }
+
+  get processArray(): Array<[number, number]> {
+    if (this.process) {
+      const processReturn = this.process(this.dots)
+      return processReturn
+    }
+    if (this.dots.length === 1) {
+      return [[0, this.dots[0].pos]]
+    } else if (this.dots.length > 1) {
+      return [[this.dots[0].pos, this.dots[this.dots.length - 1].pos]]
+    }
+    return []
+  }
+
+  get processBaseStyleArray(): Styles[] {
+    return this.processArray.map(([start, end]) => {
+      if (start > end) {
+        [start, end] = [end, start]
+      }
+      const startStyleKey = this.isHorizontal ? (
+        this.isReverse ? 'right' : 'left'
+      ) : (
+        this.isReverse ? 'bottom' : 'top'
+      )
+      return {
+        [this.isHorizontal ? 'height' : 'width']: '100%',
+        [this.isHorizontal ? 'top' : 'left']: 0,
+        [startStyleKey]: start + '%',
+        [this.isHorizontal ? 'width' : 'height']: (end - start) + '%'
+      }
+    })
   }
 
   // dot style
@@ -203,7 +263,7 @@ export default class VueSlider extends Vue {
 
   // 是否反向
   get isReverse(): boolean {
-    return this.direction === 'rtl' || this.direction === 'ttb'
+    return this.direction === 'rtl' || this.direction === 'btt'
   }
 
   // 得到所有的滑块
@@ -212,7 +272,9 @@ export default class VueSlider extends Vue {
       pos,
       value: this.control.dotsValue[index],
       focus: this.states.has(SliderState.Drag) && this.focusDotIndex === index,
-      ...((Array.isArray(this.dotOption) ? this.dotOption[index] : this.dotOption) || {}),
+      disabled: false,
+      ...this.dotStyle,
+      ...((Array.isArray(this.dotOptions) ? this.dotOptions[index] : this.dotOptions) || {}),
     }))
   }
 
@@ -221,26 +283,6 @@ export default class VueSlider extends Vue {
       return 0
     }
     return this.speed
-  }
-
-  get dotStates(): DotState[] {
-    if (!this.dotOption) {
-      return this.control.dotsValue.map(() => ({
-        disabled: false,
-        lock: false
-      }))
-    } else {
-      return Array.isArray(this.dotOption) ? this.dotOption.map(dot => ({
-        disabled: dot.lock || !!dot.disabled,
-        lock: !!dot.lock
-      })) : this.control.dotsValue.map(() => {
-        const { disabled, lock } = (this.dotOption as DotOption)
-        return {
-          disabled: lock || !!disabled,
-          lock: !!lock
-        }
-      })
-    }
   }
 
   created() {
@@ -254,20 +296,25 @@ export default class VueSlider extends Vue {
   }
 
   initControl() {
-    this.control = new Control(
-      this.value,
-      this.data,
-      this.enableCross,
-      this.fixed,
-      this.max,
-      this.min,
-      this.interval,
-      this.dotStates,
-      this.minRange,
-      this.maxRange,
-      this.marks,
-      this.emitError,
-    )
+    this.control = new Control({
+      value: this.value,
+      data: this.data,
+      enableCross: this.enableCross,
+      fixed: this.fixed,
+      max: this.max,
+      min: this.min,
+      interval: this.interval,
+      minRange: this.minRange,
+      maxRange: this.maxRange,
+      order: this.order,
+      marks: this.marks,
+      onError: this.emitError
+    })
+  }
+
+  // 判断滑块是否禁用状态
+  isDisabledByDotIndex(index: number): boolean {
+    return this.dots[index].disabled
   }
 
   // 同步值
@@ -294,6 +341,7 @@ export default class VueSlider extends Vue {
 
   // 拖拽中
   private dragMove(e: MouseEvent | TouchEvent, index: number) {
+    console.log('index', index)
     this.control.setDotPos(this.getPosByEvent(e), index)
     if (!this.lazy) {
       this.syncValueByPos()
@@ -303,14 +351,15 @@ export default class VueSlider extends Vue {
 
   // 拖拽结束
   private dragEnd() {
-    // NOTE: 滑块交叉后恢复滑块顺序位置
-    this.control.sortDotsPos()
+    if (this.order) {
+      this.control.sortDotsPos()
+    }
     if (this.lazy) {
       this.syncValueByPos()
     }
 
     setTimeout(() => {
-      // NOTE: 拖拽完毕后同步滑块的位置
+      // 拖拽完毕后同步滑块的位置
       this.control.syncDotsPos()
 
       this.states.delete(SliderState.Drag)
@@ -322,10 +371,19 @@ export default class VueSlider extends Vue {
     if (this.states.has(SliderState.Drag)) {
       return
     }
-    this.getScale()
     const pos = this.getPosByEvent(e)
-    this.control.setDotPos(pos)
+    const index = this.control.getRecentDot(pos)
+    if (this.isDisabledByDotIndex(index)) {
+      return false
+    }
+    this.getScale()
+    this.control.setDotPos(pos, index)
     this.syncValueByPos()
+
+    setTimeout(() => {
+      // 拖拽完毕后同步滑块的位置
+      this.control.syncDotsPos()
+    })
   }
 
   private getPosByEvent(e: MouseEvent | TouchEvent): number {
@@ -341,14 +399,23 @@ export default class VueSlider extends Vue {
         v-show={this.show}
         class={this.containerClasses}
         style={this.containerStyles}
-        onClick={this.clickHandle}
         aria-hidden={true}
+        onClick={this.clickHandle}
       >
         <div class="vue-slider-rail" style={this.tailStyle}>
+          {
+            this.processBaseStyleArray.map((baseStyle, index) => (
+              <div
+                class="vue-slider-process"
+                key={`process-${index}`}
+                style={[baseStyle, this.processStyle]}
+              ></div>
+            ))
+          }
           {this.dots.map((dot, index) => (
             <vue-slider-dot
               ref="dot"
-              key={index}
+              key={`dot-${index}`}
               dotSize={this.dotSize}
               value={dot.pos}
               disabled={dot.disabled}

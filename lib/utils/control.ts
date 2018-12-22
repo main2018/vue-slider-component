@@ -1,5 +1,5 @@
 import Decimal from './decimal'
-import { TValue, Marks, DotState } from '../typings'
+import { TValue, Marks } from '../typings'
 
 export const enum ERROR_TYPE {
   VALUE = 1, // 值的类型不正确
@@ -7,6 +7,9 @@ export const enum ERROR_TYPE {
   MIN, // 超过最小值
   MAX,
 }
+
+// 每个滑块变化的距离
+type DotsPosChangeArray = number[]
 
 const ERROR_MSG = {
   [ERROR_TYPE.VALUE]: 'The type of the "value" is illegal',
@@ -20,21 +23,43 @@ export default class Control {
   dotsPos: number[] = [] // 每个滑块的位置
   dotsValue: TValue[] = [] // 每个滑块的值
 
-  constructor(
+  private data: TValue[] | null // 自定义值
+  private enableCross: boolean // 是否允许滑块穿越，仅限 range 模式
+  private fixed: boolean // 是否开启固定模式
+  private max: number // 最大值
+  private min: number // 最小值
+  private interval: number // 每个值之间的间距
+  private minRange: number // 两个值之间的最小距离，仅限 range 模式
+  private maxRange: number // 两个值之间的最大距离，仅限 range 模式
+  private order: boolean
+  private marks?: boolean | Marks
+  private onError?: (type: ERROR_TYPE, message: string) => void
+
+  constructor(options: {
     value: TValue | TValue[],
-    private data: TValue[] | null,
-    private enableCross: boolean,
-    private fixed: boolean,
-    private max: number,
-    private min: number,
-    private interval: number,
-    private dotState: DotState[],
-    private minRange?: number,
-    private maxRange?: number,
-    private marks?: boolean | Marks,
-    private onError?: (type: ERROR_TYPE, message: string) => void,
-  ) {
-    this.setValue(value)
+    data: TValue[] | null,
+    enableCross: boolean,
+    fixed: boolean,
+    max: number,
+    min: number,
+    interval: number,
+    order: boolean,
+    minRange?: number,
+    maxRange?: number,
+    marks?: boolean | Marks,
+    onError?: (type: ERROR_TYPE, message: string) => void,
+  }) {
+    this.data = options.data
+    this.enableCross = options.enableCross
+    this.fixed = options.fixed
+    this.max = options.max
+    this.min = options.min
+    this.interval = options.interval
+    this.order = options.order
+    this.minRange = options.minRange || 0
+    this.maxRange = options.maxRange || 0
+    this.marks = options.marks
+    this.setValue(options.value)
   }
 
   // 设置滑块的值
@@ -43,10 +68,14 @@ export default class Control {
     this.syncDotsPos()
   }
 
-  // 设置滑块位置
-  setDotsPos(dotsPos: number[], isDrag: boolean = true) {
-    const list = [...dotsPos].sort((a, b) => a - b)
-    this.dotsPos = isDrag ? dotsPos : list
+  /**
+   * 设置滑块位置
+   * @param dotsPos
+   */
+  setDotsPos(dotsPos: number[]) {
+    // 只排序值不排序位置，在拖拽完成后再调用[syncDotsPos]排序位置
+    const list = this.order ? [...dotsPos].sort((a, b) => a - b) : dotsPos
+    this.dotsPos = list
     this.dotsValue = list.map(dotPos => this.parsePos(dotPos))
   }
 
@@ -66,18 +95,24 @@ export default class Control {
   // }
 
   /**
+   * 通过位置得到最近的一个滑块索引
+   *
+   * @param {number} pos
+   * @returns {number}
+   * @memberof Control
+   */
+  getRecentDot(pos: number): number {
+    const arr = this.dotsPos.map(dotPos => Math.abs(dotPos - pos))
+    return arr.indexOf(Math.min(...arr))
+  }
+
+  /**
    * 设置单个滑块的位置
    *
    * @param {number} pos 滑块在组件中的位置
    * @param {number} index 滑块的索引
    */
-  setDotPos(pos: number, index?: number) {
-    if (index === void 0) {
-      index = this.getRecentDot(pos)
-    }
-    if (this.dotState[index].disabled) {
-      return
-    }
+  setDotPos(pos: number, index: number) {
     // 滑块变化的距离
     pos = this.getValidPos(pos, index).pos
     const changePos = pos - this.dotsPos[index]
@@ -87,7 +122,7 @@ export default class Control {
       return
     }
 
-    let changePosArr: number[] = new Array(this.dotsPos.length)
+    let changePosArr: DotsPosChangeArray = new Array(this.dotsPos.length)
     if (this.fixed) {
       changePosArr = this.getFixedChangePosArr(changePos, index)
     } else if (this.minRange || this.maxRange) {
@@ -104,10 +139,10 @@ export default class Control {
    *
    * @param {number} changePos 单个滑块的变化距离
    * @param {number} index 滑块的索引
-   * @returns {number[]}
+   * @returns {DotsPosChangeArray}
    * @memberof Control
    */
-  private getFixedChangePosArr(changePos: number, index: number): number[] {
+  private getFixedChangePosArr(changePos: number, index: number): DotsPosChangeArray {
     this.dotsPos.forEach((originPos, i) => {
       if (i !== index) {
         const { pos: lastPos, inRange } = this.getValidPos(originPos + changePos, i)
@@ -126,33 +161,43 @@ export default class Control {
    * @param {number} pos 单个滑块的位置
    * @param {number} changePos 单个滑块的变化距离
    * @param {number} index 滑块的索引
-   * @returns {number[]}
+   * @returns {DotsPosChangeArray}
    * @memberof Control
    */
-  private getLimitRangeChangePosArr(pos: number, changePos: number, index: number): number[] {
+  private getLimitRangeChangePosArr(pos: number, changePos: number, index: number): DotsPosChangeArray {
     const changeDots = [{ index, changePos }]
     const newChangePos = changePos
     ;[this.minRange, this.maxRange].forEach((isLimitRange?: number, rangeIndex?: number) => {
       if (!isLimitRange) {
         return false
       }
-      const next = changePos > 0 ? (rangeIndex === 0 ? 1 : -1) : rangeIndex === 0 ? -1 : 1
-      const inLimitRange = (pos1: number, pos2: number) =>
-        rangeIndex === 0
-          ? Math.abs(pos1 - pos2) < this.minRangeDir
-          : Math.abs(pos1 - pos2) > this.maxRangeDir
+      const isMinRange = rangeIndex === 0
+      const isForward = changePos > 0
+      let next = 0
+      if (isMinRange) {
+        next = isForward ? 1 : -1
+      } else {
+        next = isForward ? -1 : 1
+      }
+      // 是否在限制的范围中
+      const inLimitRange = (pos2: number, pos1: number): boolean => {
+        const diff = isForward ? (pos2 - pos1) : (pos1 - pos2)
+        return isMinRange
+          ? diff < this.minRangeDir
+          : diff > this.maxRangeDir
+      }
 
       let i = index + next
       let nextPos = this.dotsPos[i]
-      let prevPos = pos
-      while (this.isPos(nextPos) && inLimitRange(nextPos, prevPos)) {
+      let curPos = pos
+      while (this.isPos(nextPos) && inLimitRange(nextPos, curPos)) {
         const { pos: lastPos } = this.getValidPos(nextPos + newChangePos, i)
         changeDots.push({
           index: i,
           changePos: lastPos - nextPos,
         })
         i = i + next
-        prevPos = lastPos
+        curPos = lastPos
         nextPos = this.dotsPos[i]
       }
     })
@@ -165,18 +210,6 @@ export default class Control {
 
   private isPos(pos: any): boolean {
     return typeof pos === 'number'
-  }
-
-  /**
-   * 通过位置得到最近的一个滑块索引
-   *
-   * @param {number} pos
-   * @returns {number}
-   * @memberof Control
-   */
-  private getRecentDot(pos: number): number {
-    const arr = this.dotsPos.map(dotPos => Math.abs(dotPos - pos))
-    return arr.indexOf(Math.min(...arr))
   }
 
   /**
@@ -306,7 +339,6 @@ export default class Control {
     const valuePosRange: Array<[number, number]> = []
 
     dotsPos.forEach((pos, i) => {
-      const prevPos = valuePosRange[i - 1] || [0, 100]
       valuePosRange.push([
         this.minRange ? this.minRangeDir * i : !this.enableCross ? dotsPos[i - 1] || 0 : 0,
         this.minRange

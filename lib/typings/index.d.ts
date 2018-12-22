@@ -12,15 +12,13 @@ export interface Marks {
   [key: string]: string | { label?: string; style?: CSSStyleDeclaration }
 }
 
-export interface DotState {
-  disabled?: boolean
-  lock?: boolean
-}
-
-export interface DotOption extends DotState {
+export interface DotStyle {
   style?: Styles
   focusStyle?: Styles
   disabledStyle?: Styles
+}
+export interface DotOption extends DotStyle {
+  disabled: boolean
 }
 
 export declare interface Dot extends DotOption {
