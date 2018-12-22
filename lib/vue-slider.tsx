@@ -46,6 +46,7 @@ export default class VueSlider extends Vue {
   private control!: Control
   private states: State = new State(SliderState)
   private scale: number = 1 // 比例，1% = ${scale}px
+  private dragRange: number[] = [] // 滑块拖拽范围，超过此范围切换拖拽滑块
 
   focusDotIndex: number = 0
 
@@ -182,21 +183,19 @@ export default class VueSlider extends Vue {
     }
   }
 
-  get processArray(): Array<[number, number]> {
+  // 进度条样式数组
+  get processBaseStyleArray(): Styles[] {
+    let processRangeArray: Array<[number,number]> = []
     if (this.process) {
       const processReturn = this.process(this.dots)
-      return processReturn
-    }
-    if (this.dots.length === 1) {
-      return [[0, this.dots[0].pos]]
+      processRangeArray = processReturn
+    } else if (this.dots.length === 1) {
+      processRangeArray = [[0, this.dots[0].pos]]
     } else if (this.dots.length > 1) {
-      return [[this.dots[0].pos, this.dots[this.dots.length - 1].pos]]
+      processRangeArray = [[this.dots[0].pos, this.dots[this.dots.length - 1].pos]]
     }
-    return []
-  }
 
-  get processBaseStyleArray(): Styles[] {
-    return this.processArray.map(([start, end]) => {
+    return processRangeArray.map(([start, end]) => {
       if (start > end) {
         [start, end] = [end, start]
       }
@@ -278,6 +277,7 @@ export default class VueSlider extends Vue {
     }))
   }
 
+  // 滑块动画过渡时间
   get animateTime(): number {
     if (this.states.has(SliderState.Drag)) {
       return 0
@@ -287,6 +287,30 @@ export default class VueSlider extends Vue {
 
   created() {
     this.initControl()
+  }
+
+  mounted() {
+    this.bindEvent()
+  }
+
+  beforeDestroy() {
+    this.unbindEvent()
+  }
+
+  bindEvent() {
+    document.addEventListener('touchmove', this.dragMove, { passive: false })
+    document.addEventListener('touchend', this.dragEnd, { passive: false })
+    document.addEventListener('mousemove', this.dragMove)
+    document.addEventListener('mouseup', this.dragEnd)
+    document.addEventListener('mouseleave', this.dragEnd)
+  }
+
+  unbindEvent() {
+    document.removeEventListener('touchmove', this.dragMove)
+    document.removeEventListener('touchend', this.dragEnd)
+    document.removeEventListener('mousemove', this.dragMove)
+    document.removeEventListener('mouseup', this.dragEnd)
+    document.removeEventListener('mouseleave', this.dragEnd)
   }
 
   getScale() {
@@ -331,8 +355,20 @@ export default class VueSlider extends Vue {
     })
   }
 
+  private getDragRange(index: number) {
+    const prevDot = this.dots[index - 1]
+    const nextDot = this.dots[index + 1]
+    return [
+      prevDot ? prevDot.pos : -Infinity,
+      nextDot ? nextDot.pos : Infinity
+    ]
+  }
+
   // 拖拽开始
   private dragStart(index: number) {
+    if (this.order) {
+      this.dragRange = this.getDragRange(index)
+    }
     this.focusDotIndex = index
     this.getScale()
     this.states.add(SliderState.Drag)
@@ -340,9 +376,28 @@ export default class VueSlider extends Vue {
   }
 
   // 拖拽中
-  private dragMove(e: MouseEvent | TouchEvent, index: number) {
-    console.log('index', index)
-    this.control.setDotPos(this.getPosByEvent(e), index)
+  private dragMove(e: MouseEvent | TouchEvent) {
+    if (!this.states.has(SliderState.Drag)) {
+      return false
+    }
+    e.preventDefault()
+    const pos = this.getPosByEvent(e)
+    if (this.order) {
+      const curIndex = this.focusDotIndex
+      let curPos = pos
+      if (curPos > this.dragRange[1]) {
+        curPos = this.dragRange[1]
+        this.focusDotIndex++
+      } else if (curPos < this.dragRange[0]) {
+        curPos = this.dragRange[0]
+        this.focusDotIndex--
+      }
+      if (curIndex !== this.focusDotIndex) {
+        this.control.setDotPos(curPos, curIndex)
+        this.dragRange = this.getDragRange(this.focusDotIndex)
+      }
+    }
+    this.control.setDotPos(pos, this.focusDotIndex)
     if (!this.lazy) {
       this.syncValueByPos()
     }
@@ -367,16 +422,17 @@ export default class VueSlider extends Vue {
     })
   }
 
+  // 处理点击事件
   private clickHandle(e: MouseEvent | TouchEvent) {
     if (this.states.has(SliderState.Drag)) {
       return
     }
+    this.getScale()
     const pos = this.getPosByEvent(e)
     const index = this.control.getRecentDot(pos)
     if (this.isDisabledByDotIndex(index)) {
       return false
     }
-    this.getScale()
     this.control.setDotPos(pos, index)
     this.syncValueByPos()
 
@@ -408,7 +464,13 @@ export default class VueSlider extends Vue {
               <div
                 class="vue-slider-process"
                 key={`process-${index}`}
-                style={[baseStyle, this.processStyle]}
+                style={[
+                  baseStyle,
+                  this.processStyle,
+                  {
+                    transition: `${this.isHorizontal ? 'width' : 'height'} ${this.animateTime}s`,
+                  }
+                ]}
               ></div>
             ))
           }
@@ -419,6 +481,7 @@ export default class VueSlider extends Vue {
               dotSize={this.dotSize}
               value={dot.pos}
               disabled={dot.disabled}
+              focus={dot.focus}
               dot-style={[
                 dot.style,
                 dot.disabled ? dot.disabledStyle : null,
@@ -432,8 +495,6 @@ export default class VueSlider extends Vue {
                 },
               ]}
               onDragStart={() => this.dragStart(index)}
-              onDragging={(e: MouseEvent | TouchEvent) => this.dragMove(e, index)}
-              onDragEnd={this.dragEnd}
             >
               {this.$scopedSlots.dot
                 ? this.$scopedSlots.dot({
@@ -443,6 +504,12 @@ export default class VueSlider extends Vue {
             </vue-slider-dot>
           ))}
         </div>
+        {
+          // Support screen readers
+          this.dots.length === 1 && !this.data ? (
+            <input class="vue-slider-sr-only" type="range" value={this.value} min={this.min} max={this.max} />
+          ) : null
+        }
       </div>
     )
   }

@@ -22,16 +22,16 @@ import VueSlider from '../lib'
   },
 })
 export default class App extends Vue {
-  // value = 50
-  value = [0, 50, 150]
+  value = 50
+  // value = [0, 50, 150, 200]
   // value = ['01', '03']
   show = true
 
   sliderOptions = {
-    // width: 380,
-    // height: 6,
-    width: 6,
-    height: 380,
+    width: 320,
+    height: 6,
+    // width: 6,
+    // height: 380,
     // dotSize: 16,
     min: 0,
     max: 200,
@@ -39,7 +39,7 @@ export default class App extends Vue {
     // order: false,
     // disabled: true,
     // enableCross: false,
-    direction: 'ttb',
+    // direction: 'ttb',
     // fixed: true,
     // lazy: true,
     // minRange: 10,
@@ -47,7 +47,7 @@ export default class App extends Vue {
     // interval: 2,
     // data: ['01', '02', '03', '04', '05', '06'],
     // process: (dots: number[], marks: number[]) => [[marks[0], dots[0]],
-    // process: (dots: any) => [[dots[0].pos, 50]],
+    // process: (dots: any) => [[dots[0].pos, dots[1].pos], [dots[2].pos, dots[3].pos]],
     marks: {
       '-10': '10℃',
       '0': '0',

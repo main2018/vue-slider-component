@@ -36,18 +36,18 @@ export default class Control {
   private onError?: (type: ERROR_TYPE, message: string) => void
 
   constructor(options: {
-    value: TValue | TValue[],
-    data: TValue[] | null,
-    enableCross: boolean,
-    fixed: boolean,
-    max: number,
-    min: number,
-    interval: number,
-    order: boolean,
-    minRange?: number,
-    maxRange?: number,
-    marks?: boolean | Marks,
-    onError?: (type: ERROR_TYPE, message: string) => void,
+    value: TValue | TValue[]
+    data: TValue[] | null
+    enableCross: boolean
+    fixed: boolean
+    max: number
+    min: number
+    interval: number
+    order: boolean
+    minRange?: number
+    maxRange?: number
+    marks?: boolean | Marks
+    onError?: (type: ERROR_TYPE, message: string) => void
   }) {
     this.data = options.data
     this.enableCross = options.enableCross
@@ -164,7 +164,11 @@ export default class Control {
    * @returns {DotsPosChangeArray}
    * @memberof Control
    */
-  private getLimitRangeChangePosArr(pos: number, changePos: number, index: number): DotsPosChangeArray {
+  private getLimitRangeChangePosArr(
+    pos: number,
+    changePos: number,
+    index: number,
+  ): DotsPosChangeArray {
     const changeDots = [{ index, changePos }]
     const newChangePos = changePos
     ;[this.minRange, this.maxRange].forEach((isLimitRange?: number, rangeIndex?: number) => {
@@ -181,10 +185,8 @@ export default class Control {
       }
       // 是否在限制的范围中
       const inLimitRange = (pos2: number, pos1: number): boolean => {
-        const diff = isForward ? (pos2 - pos1) : (pos1 - pos2)
-        return isMinRange
-          ? diff < this.minRangeDir
-          : diff > this.maxRangeDir
+        const diff = isForward ? pos2 - pos1 : pos1 - pos2
+        return isMinRange ? diff < this.minRangeDir : diff > this.maxRangeDir
       }
 
       let i = index + next

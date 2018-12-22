@@ -1,19 +1,10 @@
-import { Component, Model, Prop, Watch, Vue } from 'vue-property-decorator'
+import { Component, Prop, Vue } from 'vue-property-decorator'
 import { TValue } from './typings'
-import State, { StateMap } from './utils/state'
 
 import './styles/dot.scss'
 
-export const DotState: StateMap = {
-  None: 0,
-  Drag: 1 << 0,
-  FOCUS: 1 << 1,
-  KEY: 1 << 2,
-}
-
 @Component
 export default class VueSliderDot extends Vue {
-  states: State = new State(DotState)
   wrapWidth: number = 0
 
   $refs!: {
@@ -31,6 +22,8 @@ export default class VueSliderDot extends Vue {
   // dot 样式
   @Prop() dotStyle?: CSSStyleDeclaration
 
+  @Prop(Boolean) focus?: boolean = false
+
   // 是否禁用状态
   @Prop({ default: false })
   disabled!: boolean
@@ -40,7 +33,7 @@ export default class VueSliderDot extends Vue {
       'vue-slider-dot',
       {
         'vue-slider-dot-disabled': this.disabled,
-        'vue-slider-dot-focus': this.states.has(DotState.Drag),
+        'vue-slider-dot-focus': this.focus,
       },
     ]
   }
@@ -50,33 +43,9 @@ export default class VueSliderDot extends Vue {
       'vue-slider-handle',
       {
         'vue-slider-handle-disabled': this.disabled,
-        'vue-slider-handle-focus': this.states.has(DotState.Drag),
+        'vue-slider-handle-focus': this.focus,
       },
     ]
-  }
-
-  mounted() {
-    this.bindEvent()
-  }
-
-  beforeDestroy() {
-    this.unbindEvent()
-  }
-
-  bindEvent() {
-    document.addEventListener('touchmove', this.dragMove, { passive: false })
-    document.addEventListener('touchend', this.dragEnd, { passive: false })
-    document.addEventListener('mousemove', this.dragMove)
-    document.addEventListener('mouseup', this.dragEnd)
-    document.addEventListener('mouseleave', this.dragEnd)
-  }
-
-  unbindEvent() {
-    document.removeEventListener('touchmove', this.dragMove)
-    document.removeEventListener('touchend', this.dragEnd)
-    document.removeEventListener('mousemove', this.dragMove)
-    document.removeEventListener('mouseup', this.dragEnd)
-    document.removeEventListener('mouseleave', this.dragEnd)
   }
 
   // 拖拽开始
@@ -85,25 +54,7 @@ export default class VueSliderDot extends Vue {
       return false
     }
 
-    this.states.add(DotState.Drag)
     this.$emit('dragStart')
-  }
-
-  // 拖拽中
-  dragMove(e: MouseEvent | TouchEvent) {
-    if (!this.states.has(DotState.Drag)) {
-      return false
-    }
-
-    this.$emit('dragging', e)
-  }
-
-  // 拖拽结束
-  dragEnd() {
-    if (this.states.has(DotState.Drag)) {
-      this.states.delete(DotState.Drag)
-      this.$emit('dragEnd')
-    }
   }
 
   render() {
