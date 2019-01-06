@@ -8,9 +8,16 @@ export type TDirection = 'ltr' | 'rtl' | 'ttb' | 'btt'
 
 export type TValue = number | string | symbol
 
-export interface Marks {
-  [key: string]: string | { label?: string; style?: CSSStyleDeclaration }
+export interface Mark {
+  label: TValue
+  style?: Styles
+  activeStyle?: Styles
 }
+export interface Marks {
+  [key: string]: string | Mark
+}
+export type MarksFunction = (value: TValue) => boolean
+export type MarksProp = boolean | Marks | TValue[] | MarksFunction
 
 export interface DotStyle {
   style?: Styles

@@ -1,5 +1,5 @@
 import Decimal from './decimal'
-import { TValue, Marks } from '../typings'
+import { TValue, Mark, MarksProp } from '../typings'
 
 export const enum ERROR_TYPE {
   VALUE = 1, // 值的类型不正确
@@ -32,7 +32,7 @@ export default class Control {
   private minRange: number // 两个值之间的最小距离，仅限 range 模式
   private maxRange: number // 两个值之间的最大距离，仅限 range 模式
   private order: boolean
-  private marks?: boolean | Marks
+  private marks?: MarksProp
   private onError?: (type: ERROR_TYPE, message: string) => void
 
   constructor(options: {
@@ -46,7 +46,7 @@ export default class Control {
     order: boolean
     minRange?: number
     maxRange?: number
-    marks?: boolean | Marks
+    marks?: MarksProp
     onError?: (type: ERROR_TYPE, message: string) => void
   }) {
     this.data = options.data
@@ -90,9 +90,21 @@ export default class Control {
   }
 
   // 得到所有标志
-  // get marks(): Marks {
-  //   return
-  // }
+  get markList(): Mark[] {
+    if (!this.marks) {
+      return []
+    }
+
+    if (this.marks === true) {
+      return this.valuePos.map(pos => ({
+        label: pos,
+        style: {
+          left: pos + '%'
+        }
+      }))
+    }
+    return []
+  }
 
   /**
    * 通过位置得到最近的一个滑块索引

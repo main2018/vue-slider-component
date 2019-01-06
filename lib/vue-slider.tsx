@@ -1,20 +1,7 @@
-import {
-  Component,
-  Model,
-  Prop,
-  Vue,
-  Watch
-} from 'vue-property-decorator'
-import {
-  TValue,
-  Marks,
-  Styles,
-  DotOption,
-  DotStyle,
-  Dot,
-  TDirection
-} from './typings'
+import { Component, Model, Prop, Vue, Watch } from 'vue-property-decorator'
+import { TValue, MarksProp, Styles, DotOption, DotStyle, Dot, TDirection } from './typings'
 import VueSliderDot from './vue-slider-dot'
+import VueSliderMarks from './vue-slider-marks'
 
 import { toPx, getPos } from './utils'
 import Decimal from './utils/decimal'
@@ -29,7 +16,7 @@ export const SliderState: StateMap = {
   Drag: 1 << 0,
 }
 
-const DEFAULT_SLIDER_SIZE = 6
+const DEFAULT_SLIDER_SIZE = 4
 
 @Component({
   data() {
@@ -39,6 +26,7 @@ const DEFAULT_SLIDER_SIZE = 6
   },
   components: {
     VueSliderDot,
+    VueSliderMarks,
   },
   inheritAttrs: false,
 })
@@ -97,8 +85,7 @@ export default class VueSlider extends Vue {
   @Prop() disabled?: boolean
 
   // 自定义数据
-  @Prop(Array)
-  data!: TValue[] | null
+  @Prop(Array) data!: TValue[] | null
 
   // 是否懒同步值
   @Prop({ type: Boolean, default: false })
@@ -126,8 +113,9 @@ export default class VueSlider extends Vue {
   // 滑块之间的最大距离
   @Prop(Number) maxRange?: number
 
-  // 滑块之间的最大距离
-  @Prop() marks?: boolean | Marks
+  // 显示标识
+  @Prop([Boolean, Object, Array, Function])
+  marks?: MarksProp
 
   // tail style
   @Prop() tailStyle?: Styles
@@ -185,7 +173,7 @@ export default class VueSlider extends Vue {
 
   // 进度条样式数组
   get processBaseStyleArray(): Styles[] {
-    let processRangeArray: Array<[number,number]> = []
+    let processRangeArray: Array<[number, number]> = []
     if (this.process) {
       const processReturn = this.process(this.dots)
       processRangeArray = processReturn
@@ -199,16 +187,18 @@ export default class VueSlider extends Vue {
       if (start > end) {
         [start, end] = [end, start]
       }
-      const startStyleKey = this.isHorizontal ? (
-        this.isReverse ? 'right' : 'left'
-      ) : (
-        this.isReverse ? 'bottom' : 'top'
-      )
+      const startStyleKey = this.isHorizontal
+        ? this.isReverse
+          ? 'right'
+          : 'left'
+        : this.isReverse
+          ? 'bottom'
+          : 'top'
       return {
         [this.isHorizontal ? 'height' : 'width']: '100%',
         [this.isHorizontal ? 'top' : 'left']: 0,
         [startStyleKey]: start + '%',
-        [this.isHorizontal ? 'width' : 'height']: (end - start) + '%'
+        [this.isHorizontal ? 'width' : 'height']: end - start + '%',
       }
     })
   }
@@ -332,7 +322,7 @@ export default class VueSlider extends Vue {
       maxRange: this.maxRange,
       order: this.order,
       marks: this.marks,
-      onError: this.emitError
+      onError: this.emitError,
     })
   }
 
@@ -358,10 +348,7 @@ export default class VueSlider extends Vue {
   private getDragRange(index: number) {
     const prevDot = this.dots[index - 1]
     const nextDot = this.dots[index + 1]
-    return [
-      prevDot ? prevDot.pos : -Infinity,
-      nextDot ? nextDot.pos : Infinity
-    ]
+    return [prevDot ? prevDot.pos : -Infinity, nextDot ? nextDot.pos : Infinity]
   }
 
   // 拖拽开始
@@ -459,20 +446,26 @@ export default class VueSlider extends Vue {
         onClick={this.clickHandle}
       >
         <div class="vue-slider-rail" style={this.tailStyle}>
+          {this.processBaseStyleArray.map((baseStyle, index) => (
+            <div
+              class="vue-slider-process"
+              key={`process-${index}`}
+              style={[
+                baseStyle,
+                this.processStyle,
+                {
+                  transition: `${this.isHorizontal ? 'width' : 'height'} ${this.animateTime}s`,
+                },
+              ]}
+            />
+          ))}
           {
-            this.processBaseStyleArray.map((baseStyle, index) => (
-              <div
-                class="vue-slider-process"
-                key={`process-${index}`}
-                style={[
-                  baseStyle,
-                  this.processStyle,
-                  {
-                    transition: `${this.isHorizontal ? 'width' : 'height'} ${this.animateTime}s`,
-                  }
-                ]}
-              ></div>
-            ))
+            this.marks ? (
+              <vue-slider-marks
+                value={this.value}
+                mark-list={this.control.markList}
+              />
+            ) : null
           }
           {this.dots.map((dot, index) => (
             <vue-slider-dot
@@ -504,12 +497,16 @@ export default class VueSlider extends Vue {
             </vue-slider-dot>
           ))}
         </div>
-        {
-          // Support screen readers
-          this.dots.length === 1 && !this.data ? (
-            <input class="vue-slider-sr-only" type="range" value={this.value} min={this.min} max={this.max} />
-          ) : null
-        }
+        {// Support screen readers
+        this.dots.length === 1 && !this.data ? (
+          <input
+            class="vue-slider-sr-only"
+            type="range"
+            value={this.value}
+            min={this.min}
+            max={this.max}
+          />
+        ) : null}
       </div>
     )
   }

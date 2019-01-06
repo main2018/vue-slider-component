@@ -1,12 +1,10 @@
 import { Component, Prop, Vue } from 'vue-property-decorator'
-import { TValue } from './typings'
+import { TValue, Styles } from './typings'
 
 import './styles/dot.scss'
 
 @Component
 export default class VueSliderDot extends Vue {
-  wrapWidth: number = 0
-
   $refs!: {
     dot: HTMLDivElement
   }
@@ -20,7 +18,7 @@ export default class VueSliderDot extends Vue {
   dotSize!: number | [number, number]
 
   // dot 样式
-  @Prop() dotStyle?: CSSStyleDeclaration
+  @Prop() dotStyle?: Styles
 
   @Prop(Boolean) focus?: boolean = false
 

@@ -1,0 +1,31 @@
+@import 'theme.scss';
+
+$gap: 10px;
+.vue-slider-marks {
+  .vue-slider-mark {
+    position: absolute;
+    top: 0;
+    width: 0;
+    height: 100%;
+    z-index: 1;
+
+    &-point {
+      position: absolute;
+      left: 0;
+      top: 50%;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: #fff;
+      border: 1px solid #000;
+      opacity: .4;
+      transform: translate(-50%, -50%);
+    }
+
+    &-label {
+      position: absolute;
+      top: $gap;
+      transform: translateX(-50%);
+    }
+  }
+}
