@@ -1,7 +1,17 @@
-import { Component, Model, Prop, Vue, Watch } from 'vue-property-decorator'
-import { TValue, MarksProp, Styles, DotOption, DotStyle, Dot, TDirection } from './typings'
+import { Component, Model, Prop, Vue } from 'vue-property-decorator'
+import {
+  TValue,
+  Mark,
+  MarksProp,
+  Styles,
+  DotOption,
+  DotStyle,
+  Dot,
+  TDirection,
+  ProcessProp,
+} from './typings'
 import VueSliderDot from './vue-slider-dot'
-import VueSliderMarks from './vue-slider-marks'
+import VueSliderMark from './vue-slider-mark'
 
 import { toPx, getPos } from './utils'
 import Decimal from './utils/decimal'
@@ -26,7 +36,7 @@ const DEFAULT_SLIDER_SIZE = 4
   },
   components: {
     VueSliderDot,
-    VueSliderMarks,
+    VueSliderMark,
   },
   inheritAttrs: false,
 })
@@ -130,7 +140,7 @@ export default class VueSlider extends Vue {
   @Prop() dotOptions?: DotOption | DotOption[]
 
   // 自定义process
-  @Prop(Function) process?: (dots: Dot[]) => Array<[number, number]>
+  @Prop(Function) process?: ProcessProp
 
   // 轨道尺寸
   get tailSize() {
@@ -157,13 +167,13 @@ export default class VueSlider extends Vue {
     const containerWidth = this.width
       ? toPx(this.width)
       : this.isHorizontal
-        ? 'auto'
-        : toPx(DEFAULT_SLIDER_SIZE)
+      ? 'auto'
+      : toPx(DEFAULT_SLIDER_SIZE)
     const containerHeight = this.height
       ? toPx(this.height)
       : this.isHorizontal
-        ? toPx(DEFAULT_SLIDER_SIZE)
-        : 'auto'
+      ? toPx(DEFAULT_SLIDER_SIZE)
+      : 'auto'
     return {
       padding: `${dotHeight / 2}px ${dotWidth / 2}px`,
       width: containerWidth,
@@ -173,18 +183,9 @@ export default class VueSlider extends Vue {
 
   // 进度条样式数组
   get processBaseStyleArray(): Styles[] {
-    let processRangeArray: Array<[number, number]> = []
-    if (this.process) {
-      const processReturn = this.process(this.dots)
-      processRangeArray = processReturn
-    } else if (this.dots.length === 1) {
-      processRangeArray = [[0, this.dots[0].pos]]
-    } else if (this.dots.length > 1) {
-      processRangeArray = [[this.dots[0].pos, this.dots[this.dots.length - 1].pos]]
-    }
-
-    return processRangeArray.map(([start, end]) => {
+    return this.control.processArray.map(([start, end]) => {
       if (start > end) {
+        /* tslint:disable:semicolon */
         ;[start, end] = [end, start]
       }
       const startStyleKey = this.isHorizontal
@@ -192,8 +193,8 @@ export default class VueSlider extends Vue {
           ? 'right'
           : 'left'
         : this.isReverse
-          ? 'bottom'
-          : 'top'
+        ? 'bottom'
+        : 'top'
       return {
         [this.isHorizontal ? 'height' : 'width']: '100%',
         [this.isHorizontal ? 'top' : 'left']: 0,
@@ -323,6 +324,7 @@ export default class VueSlider extends Vue {
       order: this.order,
       marks: this.marks,
       onError: this.emitError,
+      process: this.process,
     })
   }
 
@@ -429,11 +431,16 @@ export default class VueSlider extends Vue {
     })
   }
 
+  // 获取鼠标的位置
   private getPosByEvent(e: MouseEvent | TouchEvent): number {
     return (
       getPos(e, this.$el as HTMLDivElement, this.isReverse)[this.isHorizontal ? 'x' : 'y'] /
       this.scale
     )
+  }
+
+  private _renderSlot<T>(name: string, data: T, defaultSlot: any): any {
+    return this.$scopedSlots[name] ? this.$scopedSlots[name](data) : defaultSlot
   }
 
   render() {
@@ -445,6 +452,7 @@ export default class VueSlider extends Vue {
         aria-hidden={true}
         onClick={this.clickHandle}
       >
+        {/* rail */}
         <div class="vue-slider-rail" style={this.tailStyle}>
           {this.processBaseStyleArray.map((baseStyle, index) => (
             <div
@@ -459,9 +467,22 @@ export default class VueSlider extends Vue {
               ]}
             />
           ))}
+          {/* mark */}
           {this.marks ? (
-            <vue-slider-marks value={this.value} mark-list={this.control.markList} />
+            <div class="vue-slider-marks">
+              {this.control.markList.map(mark =>
+                this._renderSlot<Mark>(
+                  'mark',
+                  mark,
+                  <vue-slider-mark mark={mark}>
+                    {this._renderSlot<Mark>('step', mark, null)}
+                    {this._renderSlot<Mark>('label', mark, null)}
+                  </vue-slider-mark>,
+                ),
+              )}
+            </div>
           ) : null}
+          {/* dot */}
           {this.dots.map((dot, index) => (
             <vue-slider-dot
               ref="dot"
@@ -484,16 +505,12 @@ export default class VueSlider extends Vue {
               ]}
               onDragStart={() => this.dragStart(index)}
             >
-              {this.$scopedSlots.dot
-                ? this.$scopedSlots.dot({
-                    ...dot,
-                  })
-                : null}
+              {this._renderSlot<Dot>('dot', dot, null)}
             </vue-slider-dot>
           ))}
         </div>
-        {// Support screen readers
-        this.dots.length === 1 && !this.data ? (
+        {/* Support screen readers */}
+        {this.dots.length === 1 && !this.data ? (
           <input
             class="vue-slider-sr-only"
             type="range"

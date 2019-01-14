@@ -7,7 +7,7 @@
       v-bind="sliderOptions"
       @error="({ type, message }) => log('error', type, message)"
     >
-      <div slot="mark" slot-scope="{ label }">{{ label }}</div>
+      <!-- <div slot="mark" slot-scope="{ label }">{{ label }}</div> -->
     </vue-slider>
     <h1 @click="show = !show">{{ value }}</h1>
   </div>
@@ -34,9 +34,9 @@ export default class App extends Vue {
     // width: 6,
     // height: 380,
     // dotSize: 16,
-    min: 0,
-    max: 200,
-    interval: 40,
+    min: -20,
+    max: 2000,
+    interval: 1,
     // order: false,
     // disabled: true,
     // enableCross: false,
@@ -61,7 +61,8 @@ export default class App extends Vue {
     //     },
     //   },
     // },
-    marks: true,
+    // marks: [-20, 300, 1000, 2000],
+    marks: (value: number) => [-20, 300, 1000, 2000].indexOf(value) > -1,
     // tailStyle: {
     //   backgroundColor: '#ccc',
     //   boxShadow: 'inset 1px 1px 0 0 rgba(0, 0, 0, .26)'

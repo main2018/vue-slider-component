@@ -1,5 +1,5 @@
 import Decimal from './decimal'
-import { TValue, Mark, MarksProp } from '../typings'
+import { TValue, Mark, Marks, MarksProp, ProcessProp, MarksFunction } from '../typings'
 
 export const enum ERROR_TYPE {
   VALUE = 1, // 值的类型不正确
@@ -33,6 +33,7 @@ export default class Control {
   private maxRange: number // 两个值之间的最大距离，仅限 range 模式
   private order: boolean
   private marks?: MarksProp
+  private process?: ProcessProp
   private onError?: (type: ERROR_TYPE, message: string) => void
 
   constructor(options: {
@@ -47,6 +48,7 @@ export default class Control {
     minRange?: number
     maxRange?: number
     marks?: MarksProp
+    process?: ProcessProp
     onError?: (type: ERROR_TYPE, message: string) => void
   }) {
     this.data = options.data
@@ -95,16 +97,42 @@ export default class Control {
       return []
     }
 
-    if (this.marks === true) {
-      return this.valuePos.map(pos => ({
-        label: this.parsePos(pos),
-        active: false,
+    const getMarkByValue = (value: TValue, mark?: Mark): Mark => {
+      const pos = this.parseValue(value)
+      return {
+        label: value,
+        active: this.isActiveByPos(pos),
+        ...mark,
         style: {
           left: pos + '%',
+          ...mark,
         },
-      }))
+      }
     }
-    return []
+
+    if (this.marks === true) {
+      return this.getValues().map(value => getMarkByValue(value))
+    } else if (Object.prototype.toString.call(this.marks) === '[object Object]') {
+      return Object.keys(this.marks).map(value => {
+        const item = (this.marks as Marks)[value]
+        return getMarkByValue(value, typeof item !== 'string' ? item : void 0)
+      })
+    } else if (Array.isArray(this.marks)) {
+      return this.marks.map(label => {
+        const pos = this.parseValue(label)
+        return {
+          label,
+          active: this.isActiveByPos(pos),
+          style: {
+            left: pos + '%',
+          },
+        }
+      })
+    } else if (typeof this.marks === 'function') {
+      return this.getValues().filter(val => (this.marks as MarksFunction)(val)).map(value => getMarkByValue(value))
+    } else {
+      return []
+    }
   }
 
   /**
@@ -262,7 +290,8 @@ export default class Control {
   private parseValue(val: TValue): number {
     if (this.data) {
       val = this.data.indexOf(val)
-    } else if (typeof val === 'number') {
+    } else if (typeof val === 'number' || typeof val === 'string') {
+      val = +val
       if (val < this.min) {
         this.emitError(ERROR_TYPE.MIN)
         return 0
@@ -279,7 +308,8 @@ export default class Control {
       return 0
     }
 
-    return this.valuePos[val]
+    const pos = new Decimal(val).multiply(this.gap)
+    return pos < 0 ? 0 : pos > 100 ? 100 : pos
   }
 
   /**
@@ -298,6 +328,49 @@ export default class Control {
   }
 
   /**
+   * 判断该位置是否激活状态
+   *
+   * @private
+   * @param {number} pos
+   * @returns {boolean}
+   * @memberof Control
+   */
+  private isActiveByPos(pos: number): boolean {
+    return this.processArray.some(([start, end]) => pos >= start && pos <= end)
+  }
+
+  /**
+   * 获得每个值
+   *
+   * @private
+   * @returns {TValue[]}
+   * @memberof Control
+   */
+  private getValues(): TValue[] {
+    if (this.data) {
+      return this.data
+    } else {
+      return Array.from(new Array(this.total), (_, index) => {
+        return new Decimal(index).multiplyChain(this.interval).plus(this.min)
+      }).concat([this.max])
+    }
+  }
+
+  /**
+   * 获得每个值的位置
+   *
+   * @private
+   * @returns {number[]}
+   * @memberof Control
+   */
+  private getValuePos(): number[] {
+    const gap = this.gap
+    return Array.from(new Array(this.total), (_, index) => {
+      return new Decimal(index).multiply(gap)
+    }).concat([100])
+  }
+
+  /**
    * 返回错误
    *
    * @private
@@ -308,6 +381,20 @@ export default class Control {
     if (this.onError) {
       this.onError(type, ERROR_MSG[type])
     }
+  }
+
+  // 进度条数组
+  get processArray(): Array<[number, number]> {
+    let processRangeArray: Array<[number, number]> = []
+    if (this.process) {
+      processRangeArray = this.process(this.dotsPos)
+    } else if (this.dotsPos.length === 1) {
+      processRangeArray = [[0, this.dotsPos[0]]]
+    } else if (this.dotsPos.length > 1) {
+      processRangeArray = [[this.dotsPos[0], this.dotsPos[this.dotsPos.length - 1]]]
+    }
+
+    return processRangeArray
   }
 
   // 所有可用值的个数
@@ -328,14 +415,6 @@ export default class Control {
   // 每个可用值之间的距离
   private get gap(): number {
     return 100 / this.total
-  }
-
-  // 每个可用值的位置
-  private get valuePos(): number[] {
-    const gap = this.gap
-    return Array.from(new Array(this.total), (_, index) => {
-      return index * gap
-    }).concat([100])
   }
 
   // 两个滑块最小的距离
@@ -359,8 +438,8 @@ export default class Control {
         this.minRange
           ? 100 - this.minRangeDir * (dotsPos.length - 1 - i)
           : !this.enableCross
-            ? dotsPos[i + 1] || 100
-            : 100,
+          ? dotsPos[i + 1] || 100
+          : 100,
       ])
     })
 

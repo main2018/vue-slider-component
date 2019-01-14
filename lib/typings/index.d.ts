@@ -10,14 +10,18 @@ export type TValue = number | string | symbol
 
 export interface Mark {
   label: TValue
-  active: boolean
+  active?: boolean
   style?: Styles
   activeStyle?: Styles
+  labelStyle?: Styles
+  labelActiveStyle?: Styles
+  stepStyle?: Styles
+  stepActiveStyle?: Styles
 }
 export interface Marks {
   [key: string]: string | Mark
 }
-export type MarksFunction = (value: TValue) => boolean
+export type MarksFunction = (value: TValue) => boolean | Mark
 export type MarksProp = boolean | Marks | TValue[] | MarksFunction
 
 export interface DotStyle {
@@ -29,10 +33,12 @@ export interface DotOption extends DotStyle {
   disabled: boolean
 }
 
-export declare interface Dot extends DotOption {
+export interface Dot extends DotOption {
   pos: number
   value: TValue
   focus: boolean
 }
+
+export type ProcessProp = (dotsPos: number[]) => Array<[number, number]>
 
 export default VueSlider
