@@ -10,6 +10,7 @@ export type TValue = number | string | symbol
 
 export interface Mark {
   label: TValue
+  active: boolean
   style?: Styles
   activeStyle?: Styles
 }

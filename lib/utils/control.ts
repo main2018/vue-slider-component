@@ -97,10 +97,11 @@ export default class Control {
 
     if (this.marks === true) {
       return this.valuePos.map(pos => ({
-        label: pos,
+        label: this.parsePos(pos),
+        active: false,
         style: {
-          left: pos + '%'
-        }
+          left: pos + '%',
+        },
       }))
     }
     return []

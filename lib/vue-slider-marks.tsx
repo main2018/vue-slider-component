@@ -18,25 +18,19 @@ export default class VueSlideMarks extends Vue {
   markList!: Mark[]
 
   get marksClasses() {
-    return [
-      'vue-slider-marks',
-      {
-      },
-    ]
+    return ['vue-slider-marks', {}]
   }
 
   render() {
     return (
-      <div
-        ref="marks"
-        class={this.marksClasses}
-      >
-        {this.$slots.default || this.markList.map(mark => (
-          <div class="vue-slider-mark" style={mark.style}>
-            <div class="vue-slider-mark-point"></div>
-            <div class="vue-slider-mark-label">{mark.label}</div>
-          </div>
-        ))}
+      <div ref="marks" class={this.marksClasses}>
+        {this.$slots.default ||
+          this.markList.map(mark => (
+            <div class="vue-slider-mark" style={mark.style}>
+              <div class="vue-slider-mark-point" />
+              <div class="vue-slider-mark-label">{mark.label}</div>
+            </div>
+          ))}
       </div>
     )
   }

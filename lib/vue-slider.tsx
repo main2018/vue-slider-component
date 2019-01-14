@@ -185,7 +185,7 @@ export default class VueSlider extends Vue {
 
     return processRangeArray.map(([start, end]) => {
       if (start > end) {
-        [start, end] = [end, start]
+        ;[start, end] = [end, start]
       }
       const startStyleKey = this.isHorizontal
         ? this.isReverse
@@ -459,14 +459,9 @@ export default class VueSlider extends Vue {
               ]}
             />
           ))}
-          {
-            this.marks ? (
-              <vue-slider-marks
-                value={this.value}
-                mark-list={this.control.markList}
-              />
-            ) : null
-          }
+          {this.marks ? (
+            <vue-slider-marks value={this.value} mark-list={this.control.markList} />
+          ) : null}
           {this.dots.map((dot, index) => (
             <vue-slider-dot
               ref="dot"
